@@ -1,0 +1,66 @@
+---
+title: "StatisticsCoursework"
+author: "Alun Meredith"
+date: "19 October 2015"
+output: pdf_document
+---
+```{r, dependencies}
+library(ggplot2)
+library(reshape2)
+```
+
+Downloaded fish.txt, data about the catch of a hypothetical fishing fleet from "http://www.edshare.soton.ac.uk/view/courses/COMP6235/2015.html" on `r date()`. 
+
+```{r, read lines}
+readLines("fish.txt", 5)
+```
+
+From reading the first 5 lines of the file we can see that the data is 2 columns of numerics. Each variable is seperated by a single whitespace, there is no header and no apparent NA characters or comment/escape characters. As such we can use the default values of read.table, including the col.names argument to name the variables.
+
+```{r, import data}
+fish <- read.table("fish.txt", col.names = c("times", "size"))
+attach(fish)
+```
+
+Initial viewing of the data
+```{r, step 1}
+clearTheme <- theme(panel.background = element_blank(), 
+  panel.grid.minor = element_blank(), 
+  panel.grid.minor = element_blank()) 
+
+top <- ggplot() +
+  geom_density(aes(times), adjust=0.5) +
+  clearTheme +
+  geom_vline(xintercept = mean(times)) +
+  geom_vline(xintercept = median(times)) + 
+  geom_vline(xintercept = exp(mean(log(times))))
+
+right <- ggplot() +
+  geom_density(aes(size), adjust=0.5) + 
+  coord_flip() +
+  clearTheme +
+  geom_vline(xintercept = mean(size)) +
+  geom_vline(xintercept = median(size)) + 
+  geom_vline(xintercept = exp(mean(log(size))))
+
+
+scatter <- ggplot(data=fish) + 
+  geom_point(aes(times,size)) 
+
+empty <- ggplot() + 
+  geom_point(aes(1,1), colour="white") +
+  clearTheme +
+  scale_x_discrete(labels="") +
+  scale_y_discrete(labels="")
+
+grid.arrange(top, empty, scatter, right, ncol=2, nrow=2, widths=c(4, 1), heights=c(1, 4))
+
+```
+
+```{r}
+summary(times)
+var(times)
+skewness(times)
+kurtosis(times)
+exp(mean(log(times)))
+```
