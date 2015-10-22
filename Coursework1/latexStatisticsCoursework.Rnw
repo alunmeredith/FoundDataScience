@@ -1,5 +1,7 @@
 \documentclass{article}
-
+\usepackage[margin=0.5in]{geometry}
+\usepackage{graphicx}
+\usepackage[font={small,it}]{caption}
 \begin{document}
 \SweaveOpts{concordance=TRUE}
 
@@ -11,6 +13,7 @@ library(gridExtra)
 library(fBasics)
 library(RColorBrewer)
 library(dplyr)
+library(grid)
 # set global chunk options
 opts_chunk$set(fig.path='figure/minimal-', fig.align='center', fig.show='hold')
 options(formatR.arrow=TRUE,width=90)
@@ -20,49 +23,75 @@ options(formatR.arrow=TRUE,width=90)
 \author{Alun Meredith}
 \maketitle
 \section{Reading data}
-Downloaded fish.txt, data about the catch of a hypothetical fishing fleet from "http://www.edshare.soton.ac.uk/view/courses/COMP6235/2015.html" on `r date()`. 
+Downloaded fish.txt, data about the catch of a hypothetical fishing fleet from:\\"http://www.edshare.soton.ac.uk/view/courses/COMP6235/2015.html" on \Sexpr{date()}. 
 <<reading lines>>=
 readLines("fish.txt", 5)
 @
-From reading the first 5 lines of the file we can see that the data is 2 columns of numerics. Each variable is seperated by a single whitespace, there is no header and no apparent NA characters or comment/escape characters. As such we can use the default values of read.table, including the col.names argument to name the variables.
+From reading the first 5 lines of the file we can see that the data is 2 numeric columns. Each variable is seperated by a single whitespace, there is no header and no apparent NA characters or comment/escape characters. As such we can use the default values of read.table, including the col.names argument to name the variables.
 <<importing data>>= 
 fish <- read.table("fish.txt", col.names = c("times", "size"))
 @
 \section{Visualising Data}
-<<graph, echo=F>>=
+<<graph, echo=F, message=F, results=hide>>=
 attach(fish)
 
-colours <- brewer.pal(3, "Set1")
+#colours <- brewer.pal(3, "Set1")
 
 clearTheme <- theme(
   panel.background = element_blank(), 
   panel.grid.minor = element_blank(), 
   panel.grid.minor = element_blank())
 
-top <- ggplot() +
-  geom_density(aes(times), adjust=0.5) +
+top <- ggplot(fish, aes(x=times)) +
+  geom_density(bw=1, fill = "blue", alpha = 0.5) +
+  geom_histogram(aes(y= ..density..), alpha=0.5, binwidth=1) +
+  stat_function(fun = dnorm, args = list(mean = mean(times), sd = sd(times)), linetype=2, size = 1) + 
+  #geom_vline(xintercept = mean(times), size = 1.2, alpha = 0.5, colour = colours[1], show_guide = T) +
+  #geom_vline(xintercept = median(times), size = 1.2, alpha = 0.5, colour = colours[2], show_guide = T) + 
+  #geom_vline(xintercept = exp(mean(log(times))), size = 1.2, alpha = 0.5, colour = colours[3], show_guide = T) +
+  #annotate("text", x = median(times)-0.5, y = 0.04, label = "median", colour = colours[2]) +
+  #annotate("text", x = mean(times)+0.5, y = 0.05, label = "mean", colour = colours[1]) +
+  #annotate("text", x = exp(mean(log(times)))-0.7, y = 0.03, label = "geometric mean", colour = colours[3]) +
   clearTheme +
-  geom_vline(xintercept = mean(times), size = 1.2, alpha = 0.5, colour = colours[1], show_guide = T) +
-  geom_vline(xintercept = median(times), size = 1.2, alpha = 0.5, colour = colours[2], show_guide = T) + 
-  geom_vline(xintercept = exp(mean(log(times))), size = 1.2, alpha = 0.5, colour = colours[3], show_guide = T) + 
-  annotate("text", x = median(times)-0.5, y = 0.04, label = "median", colour = colours[2]) +
-  annotate("text", x = mean(times)+0.5, y = 0.05, label = "mean", colour = colours[1]) +
-  annotate("text", x = exp(mean(log(times)))-0.7, y = 0.03, label = "geometric mean", colour = colours[3])
+  scale_x_continuous(breaks = seq(0,24,1)) +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title = element_text(size=12),
+        plot.margin = unit(c(1,1,-0.3,1), "cm")) +
+  ylab("Density")
 
-right <- ggplot() +
-  geom_density(aes(size), adjust=0.5) + 
+
+right <- ggplot(fish, aes(x=size)) +
   coord_flip() +
+  geom_density( fill = "blue", alpha = 0.5) +
+  geom_histogram(aes(y= ..density..), alpha=0.5, binwidth=0.2) +
+  stat_function(fun = dnorm, args = list(mean = mean(size), sd = sd(size)), linetype=2, size = 1) + 
+  #geom_vline(xintercept = mean(size), size = 1.2, alpha = 0.5, colour = colours[1], show_guide = T) +
+  #geom_vline(xintercept = median(size), size = 1.2, alpha = 0.5, colour = colours[2], show_guide = T) + 
+  #geom_vline(xintercept = exp(mean(log(size))), size = 1.2, alpha = 0.5, colour = colours[3], show_guide = T) + 
   clearTheme +
-  geom_vline(xintercept = mean(size), size = 1.2, alpha = 0.5, colour = colours[1], show_guide = T) +
-  geom_vline(xintercept = median(size), size = 1.2, alpha = 0.5, colour = colours[2], show_guide = T) + 
-  geom_vline(xintercept = exp(mean(log(size))), size = 1.2, alpha = 0.5, colour = colours[3], show_guide = T)
+  theme(axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.title = element_text(size=12),
+        plot.margin = unit(c(1,1,1,-0.5), "cm")) +
+  scale_x_continuous(minor_breaks = seq(0,5,0.25), breaks = seq(0,5,0.5)) +
+  ylab("Density")
+
+
 
 scatter <- ggplot(data=fish) + 
   geom_point(aes(times,size)) +
   stat_density2d(aes(times,size, fill = ..density..), geom="tile", alpha = 0.4, contour = F) +
   scale_fill_continuous(low = "blue", high = "red")  +
   theme(panel.background = element_blank(),
-        legend.position="none")
+        legend.position="none",
+        axis.title = element_text(size=16),
+        plot.margin = unit(c(-0.3,-1,1,1), "cm")) + 
+  scale_x_continuous(breaks = seq(0,24,1)) +
+  scale_y_continuous(minor_breaks = seq(0,5,0.25), breaks = seq(0,5,0.5)) +
+  ylab("Size of fish") +
+  xlab("Time of day (hours)")
+
 
 empty <- ggplot() + 
   geom_point(aes(1,1), colour="white") +
@@ -71,11 +100,16 @@ empty <- ggplot() +
         line = element_blank(),
         text = element_blank(),
         title = element_blank())
-pdf("figure1")
-grid.arrange(top, empty, scatter, right, ncol=2, nrow=2, widths=c(4, 1), heights=c(1, 4))
+
+jpeg("figure1.jpg", width = 720, height = 425)
+grid.arrange(top, empty, scatter, right, ncol=2, nrow=2, widths=c(4, 1), heights=c(1, 3))
 dev.off()
 @
-<<summary stats>>=
+\begin{figure}[h]
+\includegraphics[width=\linewidth]{figure1.jpg}
+\caption{\textbf{Bottom Right}: Figure showing scatter graph of size of fish caught vs time of day (hours), coloured background demonstrating a gaussian kernel 2d density \textbf{Right}: Histogram showing distribution of size of fish caught with gaussian kernel density plot overlayed \textbf{Top}: Histogram showing time of day fish caught overlayed by density plot, dashed line shows normal distribution for same mean and standard deviation}
+\end{figure}
+<<summary stats, echo=F>>=
 timesSummary <- round(c(quantile(times),
 mean(times),
 sqrt(var(times)),
