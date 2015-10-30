@@ -2,6 +2,7 @@
 \usepackage[margin=0.5in]{geometry}
 \usepackage{graphicx}
 \usepackage[font={small,it}]{caption}
+\usepackage{wrapfig}
 \begin{document}
 \SweaveOpts{concordance=TRUE}
 
@@ -14,8 +15,11 @@ library(fBasics)
 library(RColorBrewer)
 library(dplyr)
 library(grid)
+library(xtable)
+library(pracma)
+library(boot)
 # set global chunk options
-opts_chunk$set(fig.path='figure/minimal-', fig.align='center', fig.show='hold')
+opts_chunk$set(fig.path='figure/minimal-', fig.align='center', fig.show='hold', cache=T)
 options(formatR.arrow=TRUE,width=90)
 @
 
@@ -27,8 +31,8 @@ Downloaded fish.txt, data about the catch of a hypothetical fishing fleet from:\
 <<reading lines>>=
 readLines("fish.txt", 5)
 @
-From reading the first 5 lines of the file we can see that the data is 2 numeric columns. Each variable is seperated by a single whitespace, there is no header and no apparent NA characters or comment/escape characters. As such we can use the default values of read.table, including the col.names argument to name the variables.
-<<importing data>>= 
+From reading the first 5 lines of the file we can see that the data is in 2 numeric columns. Each variable is seperated by a single whitespace, there is no header and no apparent NA characters or comment/escape characters. As such we can use the default values of read.table, including the col.names argument to name the variables.
+<<importing data, echo=F>>= 
 fish <- read.table("fish.txt", col.names = c("times", "size"))
 @
 \section{Visualising Data}
@@ -46,18 +50,12 @@ top <- ggplot(fish, aes(x=times)) +
   geom_density(bw=1, fill = "blue", alpha = 0.5) +
   geom_histogram(aes(y= ..density..), alpha=0.5, binwidth=1) +
   stat_function(fun = dnorm, args = list(mean = mean(times), sd = sd(times)), linetype=2, size = 1) + 
-  #geom_vline(xintercept = mean(times), size = 1.2, alpha = 0.5, colour = colours[1], show_guide = T) +
-  #geom_vline(xintercept = median(times), size = 1.2, alpha = 0.5, colour = colours[2], show_guide = T) + 
-  #geom_vline(xintercept = exp(mean(log(times))), size = 1.2, alpha = 0.5, colour = colours[3], show_guide = T) +
-  #annotate("text", x = median(times)-0.5, y = 0.04, label = "median", colour = colours[2]) +
-  #annotate("text", x = mean(times)+0.5, y = 0.05, label = "mean", colour = colours[1]) +
-  #annotate("text", x = exp(mean(log(times)))-0.7, y = 0.03, label = "geometric mean", colour = colours[3]) +
   clearTheme +
+  labs(title="Distributions of the size of fish and time of day caught")+
   scale_x_continuous(breaks = seq(0,24,1)) +
   theme(axis.title.x = element_blank(),
-        axis.text.x = element_blank(),
         axis.title = element_text(size=12),
-        plot.margin = unit(c(1,1,-0.3,1), "cm")) +
+        plot.margin = unit(c(1,1,0,1), "cm")) +
   ylab("Density")
 
 
@@ -71,9 +69,8 @@ right <- ggplot(fish, aes(x=size)) +
   #geom_vline(xintercept = exp(mean(log(size))), size = 1.2, alpha = 0.5, colour = colours[3], show_guide = T) + 
   clearTheme +
   theme(axis.title.y = element_blank(),
-        axis.text.y = element_blank(),
         axis.title = element_text(size=12),
-        plot.margin = unit(c(1,1,1,-0.5), "cm")) +
+        plot.margin = unit(c(1,1,1,0), "cm")) +
   scale_x_continuous(minor_breaks = seq(0,5,0.25), breaks = seq(0,5,0.5)) +
   ylab("Density")
 
@@ -101,15 +98,16 @@ empty <- ggplot() +
         text = element_blank(),
         title = element_blank())
 
-jpeg("figure1.jpg", width = 720, height = 425)
+jpeg("figure1.jpg", width = 720, height = 465)
 grid.arrange(top, empty, scatter, right, ncol=2, nrow=2, widths=c(4, 1), heights=c(1, 3))
 dev.off()
 @
 \begin{figure}[h]
 \includegraphics[width=\linewidth]{figure1.jpg}
-\caption{\textbf{Bottom Right}: Figure showing scatter graph of size of fish caught vs time of day (hours), coloured background demonstrating a gaussian kernel 2d density \textbf{Right}: Histogram showing distribution of size of fish caught with gaussian kernel density plot overlayed \textbf{Top}: Histogram showing time of day fish caught overlayed by density plot, dashed line shows normal distribution for same mean and standard deviation}
+\caption{\textbf{Bottom Left}: Scatter graph of size of fish caught vs time of day (hours), coloured background demonstrating gaussian kernel 2d density \textbf{Right}: Histogram showing distribution of size of fish caught with gaussian kernel density plot overlayed \textbf{Top}: Histogram showing time of day fish caught overlayed by density plot, dashed line shows normal distributions for equal mean and standard deviation}
+\label{fig:1}
 \end{figure}
-<<summary stats, echo=F>>=
+<<summary stats, echo=F, results=tex>>=
 timesSummary <- round(c(quantile(times),
 mean(times),
 sqrt(var(times)),
@@ -126,36 +124,75 @@ kurtosis(size),
 exp(mean(log(size)))),2)
 names(sizeSummary) <- c("min", "Q1", "median", "Q3", "max", "mean", "s.dev", "skewness", "kurtosis", "geometric mean")
 
-sizeSummary; timesSummary
+print(xtable(rbind(sizeSummary, timesSummary), caption="Numeric summary statistics for Time and Size Distributions"), caption.placement = "top")
 @
-By looking at the above summary statistics and the density distributions in the figure, we can see some interesting features of the distributions. The times fish were caught was very broad. A standard deviation of \Sexpr{round(sqrt(var(times)),2)}, along side the mean describes a typical value as anywhere in the range: \Sexpr{round(mean(times) + c(-1,1) * sqrt(var(times)),2)}. The positive skewness which can be seen in the plot is surprising as you would expect the density at 12:01 to be approximately equal to the density at 11:59. This suggests that an effect such as this data being recorded on a Saturday when no fishing is done on a Sunday is occuring, but requires more domain knowledge to analyse fully. 
-The distribution of fish sizes shows a distribution which has some signs of being bi-modal. The standard deviation covers \Sexpr{round(100 * 2*sizeSummary["s.dev"] / (sizeSummary["max"] - sizeSummary["min"]),2)}\% of the data range, which is actually greater than the wide flat times data of \Sexpr{round(100 * 2*timesSummary["s.dev"] / (timesSummary["max"] - timesSummary["min"]),2)}. Both the mean and median sits between the two peaks and there is negligible skewness because the peaks are approximately symmetric and equal in size. 
-By assuming an approximation to a normal distribution (t distribution with large degrees of freedom), we can use the t.test function to calcualte confidence intervals. The t.test function makes Bessel's correction automatically.
-<<t test>>=
-t.test(times)$conf.int
-t.test(size)$conf.int
+
+\section{Analysing Distributions}
+
+By looking at the above summary statistics and the density distributions in figure \ref{fig:1}, we can see some interesting features of the distributions. The time fish were caught was very broard with high standard deviation. There is some skewness which can be seen clearly in the plot. This is fairly surprising as you would expect the density at 12:01 to be approximately equal to the density at 11:59 in a cyclical manner. This suggests that an effect such as the data being recorded on a Saturday where no fishing is done on a Sunday is occuring, but requires more domain knowledge to analyse fully.
+
+The distribution of fish sizes (right hand density plot in figure \ref{fig:1}) shows a distribution which is visibly bimodal. The standard deviation covers \Sexpr{round(100 * 2*sizeSummary["s.dev"] / (sizeSummary["max"] - sizeSummary["min"]),2)}\% of the data range, which is greater than the wide flat times data of \Sexpr{round(100 * 2*timesSummary["s.dev"] / (timesSummary["max"] - timesSummary["min"]),2)}, this is probably due to the bimodal distributions. Both the mean and median sits between the two peaks and there is negligible skewness because the peaks are approximately symmetric and equal in size. 
+
+\subsection{Confidence Intervals}
+
+<<bootstrapping, echo=FALSE, results=hide>>=
+mean.fun <- function(dat, idx) mean(dat[idx], na.rm = TRUE)
+
+boot.out <- boot(size, mean.fun, R=10000, sim="ordinary")
+boot.out.frame <- as.data.frame(boot.out$t)
+names(boot.out.frame) <- "t"
+
+boot.time <- boot(fish$time, mean.fun, R=10000, sim="ordinary")
+boot.time.frame <- as.data.frame(boot.time$t)
+names(boot.time.frame) <- "t"
+
+jpeg("figure3.jpg", width = 360, height=240)
+ggplot(boot.out.frame, aes(x=t)) +
+  geom_density( fill = "blue", alpha = 0.5) +
+  geom_histogram(aes(y= ..density..), alpha=0.5, binwidth=0.025) +
+  stat_function(fun = dnorm, args = list(mean = mean(boot.out.frame$t), sd = sd(boot.out.frame$t)), linetype=2, size = 1) +
+  xlab("Sample Means")
+dev.off()
 @
-We can also map our distributions onto the standard normal curve. The sample distribution mean approximates the mean of the population so we can normalise mean by simply subtracting it. The variance of the sample is given by Bessels correction $s = \sqrt{\frac{\sum{(x-\mu)^2}}{n-1}}$. The variance given by the *var()* function includes Bessel's correction automatically so we just use the *qnorm* function with mean = mean(data) and sd = sqrt(var(data)/n) to compute a confidence interval.
-<<qnorm>>=
-qnorm(c(0.95,0.025), mean = mean(times), sd = sqrt(var(times)/length(times)))
+
+\begin{wrapfigure}[11]{R}{6cm}
+  \includegraphics[width=0.9\linewidth]{figure3.jpg}
+  \caption{10000 sample means taken from fish size data, blue region is density, dashed line shows normal distribution with equal mean and variance.}
+  \label{fig:three}
+\end{wrapfigure}
+
+Both of the distributions are clearly not normally distributed as shown by the dashed normal distributions (with same mean/variance) shown in the figure. This introduces some complexity in producing confidence intervals. For the time caught confidence interval it is possible to closely approximate the normal distribution by transforming the data.
+
+In order to evaluate a confidence interval from these non-standard distributions a method called Bootstrapping is used. As shown in fig.\ref{fig:three} by resampling our data and plotting the means we get a distribution that closely approximates the normal distribution via the central limit theorem. The mean of a sample distribution approximates the mean of the population it was sampled from. By calculating a confidence interval for this mean we can estimate a 95\% confidence interval for the population of:
+
+<<confidence intervals, echo=F, results=tex>>=
+tTest <- t.test(times)$conf.int
+SizeConfidence <- qnorm(c(0.025,0.975), mean(boot.out.frame$t), sd(boot.out.frame$t))
+TimeConfidence <- qnorm(c(0.025,0.975), mean(boot.time.frame$t), sd(boot.time.frame$t))
+print(xtable(rbind(SizeConfidence, TimeConfidence), caption="Bootstrapped 95 percent confidence intervals"), include.colnames=F)
+
 @
-The central figure above shows a scatter of size of fish and time of day. It is hard to identify any dependencies in the data from this but it looks as though it may be slightly weakly correlated. 
-<<covariance/correlation>>=
-cov(times, fish)
-cor(times, fish)
+
+\section{Codependency}
+<<covariance/correlation, results=tex, echo=F>>=
+covariance <- cov(times,fish)
+correlation <- cor(times, fish)
 @
-You would expect the bigger fish to be easier to catch and therefore some negative correlation to be occuring. The bigger fish will be caught earlier and only the smaller fish left to be caught later. However the correlation is quite small \Sexpr{round(cor(times,fish)[1,2],2)} and the timescale relatively small we would need mroe domain knowledge to conclude an effect like this. For instance if the fishing is taking place over a larger area (larger population of fish) then the fish caught early in the day will have quite a small effect on the ammount left at the end of the day. 
+
+The central figure above shows a scatter of size of fish and time of day. It is hard to identify any dependencies in the data visually but it looks as though it may be slightly weakly correlated. After numerical analysis we can see a covariance of \Sexpr{round(covariance[2],2)} and a Pearson product-moment correlation of \Sexpr{ round(correlation[2],2)}.
+
+The correlation is very weak but one explanation could be that you would expect the bigger fish to be easier to catch, therefore the population of bigger fish in the water shrinks over the course of the day. We would need more domain knowledge to conclude an effect like this. For instance if the fishing is taking place over a larger area (larger population of fish) then the fish caught early in the day will have quite a small effect on the ammount left at the end of the day. 
+
 \section{Intervals}
-Splitting the times into 24 intevals corresponding to each hour of the day we can analyse which interval of time has the highest rate of catch (most fish caught that hour) and which has the highest average size of fish. 
-<<Intervals>>=
+<<Intervals, echo=F>>=
 #which.max(summary(cut(times, 0:25)))
 intevals <- lapply(0:23, function(x)
   size[times > x & times <= x+1])
   
 names(intevals) <- paste("x",paste(0:23, 1:24, sep = "-"), sep="")
-
-which.max(sapply(intevals, length))
-which.max(sapply(intevals, mean))
 @
-Looking at this data however we can see that the 21:00-22:00 period has the biggest average fish caught is not what was expected considering the negative correlation calcualted. Looking at each inteval however, this is an outlier as the general trend is that the first third of the day averages around 2 and the last half the day is almsot entirely below 2 (with 2 exceptions). 
+
+Splitting the times into 24 intevals corresponding to each hour of the day we can show the interval of time with the highest rate of catch is \Sexpr{which.max(sapply(intevals, length))-1}:00 to  \Sexpr{which.max(sapply(intevals, length))}:00. The interval with the largest average size of fish caught is \Sexpr{which.max(sapply(intevals, mean))-1}:00 to \Sexpr{which.max(sapply(intevals, mean))}:00. 
+
+Although this period has the largest average size of fish caught, it is not what would be initially expected considering the negative correlation calcualted. If each interval is inspected individually this apears to be an outlier. The general trend is that until 8.00 the average is around 2 and after 12 is almsot entirely below 2 (with just 2 exceptions). 
 \end{document}
