@@ -219,8 +219,9 @@ dev.off()
 @
 
 \begin{wrapfigure}[11]{R}{6cm}
-  \includegraphics[width=0.9\linewidth]{figure4.jpg}
-  \caption{incomplete}
-  \label{fig:four}
+  \includegraphics[width=0.9\linewidth]{figure3.jpg}
+  \caption{10000 sample means taken from fish size data, blue region is density, dashed line shows normal distribution with equal mean and variance.}
+  \label{fig:three}
 \end{wrapfigure}
+
 \end{document}
