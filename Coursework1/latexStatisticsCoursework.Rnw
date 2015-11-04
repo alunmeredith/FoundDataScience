@@ -202,15 +202,13 @@ intervals = as.data.frame(cbind(intervalSize, intervalFreq, 0:23))
 intervals$intervalSize <- as.numeric(intervals$intervalSize)
 intervals$intervalFreq <- as.integer(intervals$intervalFreq)
 sizeIntervalPlot <- ggplot(intervals, aes(x = V3, y = intervalSize)) + geom_bar(stat = "identity") +
-  theme(axis.text.x=element_text(hjust=2)) +
-  labs(x = "Hour Interval (starting time)", y = "Mean Fish Size", title = "Mean fish size each Hour")
+  scale_x_continuous(label=function(x){return(paste(x, ":00"))}) +
+  labs(x = "Hour Interval (start time)", y = "Mean Fish Size", title = "Mean fish size each Hour")
 timeIntervalPlot <- ggplot(intervals, aes(x = V3, y = intervalFreq)) + geom_bar(stat = "identity") +
-  #scale_x_continuous(label=function(x) return(paste(x,":00")))
-  theme(axis.text.x=element_text(hjust=2)) +
-  labs(x = "Hour Interval", y = "Frequency of fish caught", title = "Number of fish caught each Hour")
+  scale_x_continuous(label=function(x){return(paste(x, ":00"))}) +
+  labs(x = "Hour Interval (start time)", y = "Frequency of fish caught", title = "Number of fish caught each Hour")
 
-jpeg("figure4.jpg", width = 480, height=240)
-#grid.arrange(sizeIntervalPlot, timeIntervalPlot)
+jpeg("figure4.jpg", width = 480, height=360)
 sizeIntervalPlot
 dev.off()
 @
