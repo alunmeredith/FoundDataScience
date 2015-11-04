@@ -124,10 +124,11 @@ names(timesSummary) <- c("min", "Q1", "median", "Q3", "max", "mean", "s.dev", "s
 sizeSummary <- round(c(quantile(size),
 mean(size),
 sqrt(var(size)),
+var(size),
 skewness(size),
 kurtosis(size),
 exp(mean(log(size)))),2)
-names(sizeSummary) <- c("min", "Q1", "median", "Q3", "max", "mean", "s.dev", "skewness", "kurtosis", "geometric mean")
+names(sizeSummary) <- c("min", "Q1", "median", "Q3", "max", "mean", "s.dev", "var", "skewness", "kurtosis", "geometric mean")
 
 print(xtable(rbind(sizeSummary, timesSummary), caption="Numeric summary statistics for Time and Size Distributions"), caption.placement = "top")
 @
@@ -136,7 +137,7 @@ print(xtable(rbind(sizeSummary, timesSummary), caption="Numeric summary statisti
 
 By looking at the above summary statistics and the density distributions in figure \ref{fig:1}, we can see some interesting features of the distributions. The time fish were caught was very broard with high standard deviation. There is some skewness which can be seen clearly in the plot. This is fairly surprising as you would expect the density at 12:01 to be approximately equal to the density at 11:59 in a cyclical manner. This suggests that an effect such as the data being recorded on a Saturday where no fishing is done on a Sunday is occuring, but requires more domain knowledge to analyse fully.
 
-The distribution of fish sizes (right hand density plot in figure \ref{fig:1}) shows a distribution which is visibly bimodal. The standard deviation covers \Sexpr{round(100 * 2*sizeSummary["s.dev"] / (sizeSummary["max"] - sizeSummary["min"]),2)}\% of the data range, which is greater than the wide flat times data of \Sexpr{round(100 * 2*timesSummary["s.dev"] / (timesSummary["max"] - timesSummary["min"]),2)}, this is probably due to the bimodal distributions. Both the mean and median sits between the two peaks and there is negligible skewness because the peaks are approximately symmetric and equal in size. 
+The distribution of fish sizes (right hand density plot in figure \ref{fig:1}) shows a distribution which is visibly bimodal. The standard deviation covers \Sexpr{round(100 * 2*sizeSummary["s.dev"] / (sizeSummary["max"] - sizeSummary["min"]),2)}\% of the data range, which is greater than the wide flat times data of \Sexpr{round(100 * 2*timesSummary["s.dev"] / (timesSummary["max"] - timesSummary["min"]),2)}, this is probably due to the bimodal distributions. Both the mean and median sits centrally between the two peaks with low skewness because the peaks are approximately symmetric and equal in size. 
 
 \subsection{Confidence Intervals}
 
@@ -166,41 +167,35 @@ dev.off()
   \label{fig:three}
 \end{wrapfigure}
 
-Both of the distributions are not normally distributed as shown by the dashed normal distributions (with same mean/variance) shown in  figure 1. This introduces some complexity in producing confidence intervals. For the time caught confidence interval it is possible to closely approximate the normal distribution by transforming the data, e.g. applying an exponent of approximately 0.79 removes the bias.
+Both of the distributions are not normally distributed, the normal distributions in fig \ref{fig:1} doesn't accurately describe the observations. This introduces some complexity in producing confidence intervals. For the time caught confidence interval it is possible to closely approximate the normal distribution by transforming the data, e.g. applying an exponent of approximately 0.79 removes the bias.
 
-In order to evaluate a confidence interval from these non-standard distributions a Bootstrapping method is used. As shown in fig.\ref{fig:three} by resampling our data and plotting the means we get a distribution that closely approximates the normal distribution via the central limit theorem. The mean of a sample distribution approximates the mean of the population it was sampled from. By calculating a confidence interval for this mean we can estimate a 95\% confidence interval for the population of:
+In order to evaluate a confidence interval from these non-standard distributions a Bootstrapping method is used. As shown in fig.\ref{fig:three} by resampling our data and plotting the means we get a distribution that closely approximates the normal distribution via the central limit theorem. The mean of a sample distribution approximates the mean of the population it was sampled from. By calculating a confidence interval for this mean we can estimate a 95\% confidence interval for the population of:\footnote{At 3 significant figures the students t test yields the same confidence intervals, for applications where accuracy is only required at this level the students t test or normal approximation is sufficient.}
 
 <<confidence intervals, echo=F, results=tex>>=
 tTest <- t.test(times)$conf.int
 SizeConfidence <- qnorm(c(0.025,0.975), mean(boot.out.frame$t), sd(boot.out.frame$t))
 TimeConfidence <- qnorm(c(0.025,0.975), mean(boot.time.frame$t), sd(boot.time.frame$t))
-print(xtable(rbind(SizeConfidence, TimeConfidence), caption="Bootstrapped confidence intervals for the mean (95%)"), include.colnames=F, digits = 4)
+confTable <- rbind(SizeConfidence, TimeConfidence)
+print(
+  xtable(confTable, caption="Bootstrapped confidence intervals \\\\ for the mean (95 percent)"), 
+  include.colnames=F, digits = 4)
 @
 
-Note: At 3 significant figures the students t test yields the same confidence intervals, for applications where accuracy is only required at this level the students t test or normal approximation is sufficient.
-\subsection{Codependency}
+\subsection{Codependency and Time intervals}
 <<covariance/correlation, results=tex, echo=F>>=
 covariance <- cov(times,fish)
 correlation <- cor(times, fish)
 correlationTest <- cor.test(times,size)
 @
 
-Figure 1: bottom left, shows a scatter of size of fish and time of day. It is hard to identify any dependencies in the data visually. After numerical analysis we can see a covariance of \Sexpr{round(covariance[2],2)} and a Pearson product-moment correlation of \Sexpr{round(correlationTest$statistic,2)} (\Sexpr{ round(attr(correlationTest$conf.int, "conf.level"),2)} \% CI: \Sexpr{round(correlationTest$conf.int[1],2)} to \Sexpr{round(correlationTest$conf.int[2],2)}).
-
-The correlation is very weak, and the 95\% interval overlaps 0 so there is no evidence of correlation between these variables but one explanation of weak correlation could be that you would expect the bigger fish to be easier to catch, therefore the population of bigger fish in the water shrinks over the course of the day. However considering the size of the space fishing boats typically fish in any effect like this is likely neglibible.  
-
-\subsection{Intervals}
 <<Intervals, echo=F>>=
-#which.max(summary(cut(times, 0:25)))
 intevals <- lapply(0:23, function(x)
   size[times > x & times <= x+1])
   
 names(intevals) <- paste("x",paste(0:23, 1:24, sep = "-"), sep="")
 @
 
-Splitting the times into 24 intevals corresponding to each hour of the day we can show the interval of time with the highest rate of catch is \Sexpr{which.max(sapply(intevals, length))-1}:00 to  \Sexpr{which.max(sapply(intevals, length))}:00. The interval with the largest average size of fish caught is \Sexpr{which.max(sapply(intevals, mean))-1}:00 to \Sexpr{which.max(sapply(intevals, mean))}:00. 
-
-<<Intervals plot>>=
+<<Intervals plot, echo=F, results=hide>>=
 intervalFreq = sapply(intevals, length)
 intervalSize = sapply(intevals, function(x) mean(x, na.rm=T))
 intervals = as.data.frame(cbind(intervalSize, intervalFreq, 0:23))
@@ -208,20 +203,29 @@ intervals$intervalSize <- as.numeric(intervals$intervalSize)
 intervals$intervalFreq <- as.integer(intervals$intervalFreq)
 sizeIntervalPlot <- ggplot(intervals, aes(x = V3, y = intervalSize)) + geom_bar(stat = "identity") +
   theme(axis.text.x=element_text(hjust=2)) +
-  labs(x = "Hour Interval", y = "Mean Fish Size", title = "Mean fish size each Hour")
+  labs(x = "Hour Interval (starting time)", y = "Mean Fish Size", title = "Mean fish size each Hour")
 timeIntervalPlot <- ggplot(intervals, aes(x = V3, y = intervalFreq)) + geom_bar(stat = "identity") +
+  #scale_x_continuous(label=function(x) return(paste(x,":00")))
   theme(axis.text.x=element_text(hjust=2)) +
   labs(x = "Hour Interval", y = "Frequency of fish caught", title = "Number of fish caught each Hour")
 
-jpeg("figure4.jpg", width = 360, height=240)
-grid.arrange(sizeIntervalPlot, timeIntervalPlot)
+jpeg("figure4.jpg", width = 480, height=240)
+#grid.arrange(sizeIntervalPlot, timeIntervalPlot)
+sizeIntervalPlot
 dev.off()
 @
 
-\begin{wrapfigure}[11]{R}{6cm}
-  \includegraphics[width=0.9\linewidth]{figure3.jpg}
-  \caption{10000 sample means taken from fish size data, blue region is density, dashed line shows normal distribution with equal mean and variance.}
+\begin{wrapfigure}[12]{ht}{6cm}
+  \includegraphics[width=0.9\linewidth]{figure4.jpg}
+  \caption{Mean size of fish caught each hour}
   \label{fig:three}
 \end{wrapfigure}
+
+Visually Figure 1 (bottom left), showing a scatter plot of time of fish vs size of day demonstrates no obvious correlation between time of catch and size of catch. After numerical analysis we can see a covariance of \Sexpr{round(covariance[2],2)} and a Pearson product-moment correlation of \Sexpr{round(correlationTest$statistic,2)} (\Sexpr{ round(attr(correlationTest$conf.int, "conf.level"),2)} \% CI: \Sexpr{round(correlationTest$conf.int[1],2)} to \Sexpr{round(correlationTest$conf.int[2],2)}).
+
+The correlation is very weak, and the 95\% interval overlaps 0 so there is no evidence of correlation between these variables but one explanation of weak correlation could be that you would expect the bigger fish to be easier to catch, therefore the population of bigger fish in the water shrinks over the course of the day. However considering the size of the space fishing boats typically fish in any effect like this is likely neglibible.  
+
+
+Splitting the times into 24 intevals corresponding to each hour of the day we can show the interval of time with the highest rate of catch is \Sexpr{which.max(sapply(intevals, length))-1}:00 to  \Sexpr{which.max(sapply(intevals, length))}:00. The interval with the largest average size of fish caught is \Sexpr{which.max(sapply(intevals, mean))-1}:00 to \Sexpr{which.max(sapply(intevals, mean))}:00. 
 
 \end{document}
