@@ -12,41 +12,32 @@
 \author{Alun Meredith}
 \maketitle
 \section{Reading data}
-Downloaded fish.txt, data about the catch of a hypothetical fishing fleet from:\\"http://www.edshare.soton.ac.uk/view/courses/COMP6235/2015.html" on Sun Oct 25 20:20:01 2015. 
-\begin{Schunk}
-\begin{Sinput}
-> readLines("fish.txt", 5)
-\end{Sinput}
-\begin{Soutput}
-[1] "15.25 2.79 " "13.45 2.69 " "5.58 2.20 "  "7.17 3.21 "  "13.81 2.12 "
-\end{Soutput}
-\end{Schunk}
-From reading the first 5 lines of the file we can see that the data is 2 numeric columns. Each variable is seperated by a single whitespace, there is no header and no apparent NA characters or comment/escape characters. As such we can use the default values of read.table, including the col.names argument to name the variables.
+Downloaded fish.txt, data about the catch of a hypothetical fishing fleet from:\\"http://www.edshare.soton.ac.uk/view/courses/COMP6235/2015.html" on Thu Nov 05 10:13:37 2015. 
 \section{Visualising Data}
 \begin{figure}[h]
 \includegraphics[width=\linewidth]{figure1.jpg}
-\caption{\textbf{Bottom Left}: Scatter graph of size of fish caught vs time of day (hours), coloured background demonstrating gaussian kernel 2d density \textbf{Right}: Histogram showing distribution of size of fish caught with gaussian kernel density plot overlayed \textbf{Top}: Histogram showing time of day fish caught overlayed by density plot, dashed line shows normal distributions for equal mean and standard deviation}
+\caption{\textbf{Bottom Left}: Scatter graph of size of fish caught vs time of day (hours), coloured background demonstrating gaussian kernel 2d density \textbf{Right}: Histogram showing distribution of size of fish caught and gaussian kernel density \textbf{Top}: Histogram showing time of day fish caught overlayed by gaussian kernel density}
 \label{fig:1}
 \end{figure}
-% latex table generated in R 3.2.1 by xtable 1.7-4 package
-% Sun Oct 25 20:20:02 2015
+% latex table generated in R 3.2.2 by xtable 1.8-0 package
+% Thu Nov 05 10:13:38 2015
 \begin{table}[ht]
 \centering
-\begin{tabular}{rrrrrrrrrrr}
+\caption{Numeric summary statistics for Time and Size Distributions} 
+\begin{tabular}{rrrrrrrrrrrr}
   \hline
- & min & Q1 & median & Q3 & max & mean & s.dev & skewness & kurtosis & geometric mean \\ 
+ & min & Q1 & median & Q3 & max & mean & s.dev & var & skewness & kurtosis & geometric mean \\ 
   \hline
-sizeSummary & 0.01 & 0.94 & 1.83 & 2.74 & 4.23 & 1.84 & 1.08 & 0.09 & -1.17 & 1.37 \\ 
-  timesSummary & 0.01 & 4.88 & 8.95 & 13.22 & 23.16 & 9.39 & 5.66 & 0.25 & -0.89 & 6.79 \\ 
+sizeSummary & 0.01 & 0.94 & 1.83 & 2.74 & 4.23 & 1.84 & 1.08 & 1.16 & 0.09 & -1.17 & 1.37 \\ 
+  timesSummary & 0.01 & 4.88 & 8.95 & 13.22 & 23.16 & 9.39 & 5.66 & 0.25 & -0.89 & 6.79 & 0.01 \\ 
    \hline
 \end{tabular}
-\caption{Numeric summary statistics for Time and Size Distributions} 
 \end{table}
 \section{Analysing Distributions}
 
-By looking at the above summary statistics and the density distributions in figure \ref{fig:1}, we can see some interesting features of the distributions. The time fish were caught was very broard with high standard deviation. There is some skewness which can be seen clearly in the plot. This is fairly surprising as you would expect the density at 12:01 to be approximately equal to the density at 11:59 in a cyclical manor. This suggests that an effect such as the data being recorded on a Saturday where no fishing is done on a Sunday is occuring, but requires more domain knowledge to analyse fully.
+By looking at the above summary statistics and the density distributions in figure \ref{fig:1}, we can see some interesting features of the distributions. The time fish were caught was very broard with high standard deviation. There is some skewness which can be seen clearly in the plot. This is fairly surprising as you would expect the density at 12:01 to be approximately equal to the density at 11:59 in a cyclical manner. This suggests that an effect such as the data being recorded on a Saturday where no fishing is done on a Sunday is occuring, but requires more domain knowledge to analyse fully.
 
-The distribution of fish sizes (right hand density plot in figure \ref{fig:1}) shows a distribution which is visibly bimodal. The standard deviation covers 51.18\% of the data range, which is greater than the wide flat times data of 48.9, this is probably due to the bimodal distributions. Both the mean and median sits between the two peaks and there is negligible skewness because the peaks are approximately symmetric and equal in size. 
+The distribution of fish sizes (right hand density plot in figure \ref{fig:1}) shows a distribution which is visibly bimodal. The standard deviation covers 51.18\% of the data range, which is greater than the wide flat times data of 48.9, this is probably due to the bimodal distributions. Both the mean and median sits centrally between the two peaks with low skewness because the peaks are approximately symmetric and equal in size. 
 
 \subsection{Confidence Intervals}
 
@@ -57,32 +48,40 @@ The distribution of fish sizes (right hand density plot in figure \ref{fig:1}) s
   \label{fig:three}
 \end{wrapfigure}
 
-Both of the distributions are clearly not normally distributed as shown by the dashed normal distributions (with same mean/variance) shown in the figure. This introduces some complexity in producing confidence intervals. For the time caught confidence interval it is possible to closely approximate the normal distribution by transforming the data.
+Both of the distributions are not normally distributed, the normal distributions in fig \ref{fig:1} doesn't accurately describe the observations. This introduces some complexity in producing confidence intervals. For the time caught confidence interval it is possible to closely approximate the normal distribution by transforming the data, e.g. applying an exponent of approximately 0.79 removes the bias.
 
-In order to evaluate a confidence interval from these non-standard distributions a method called bootstrapping is used. As shown in fig.\ref{fig:three} by resampling our data and plotting the means we get a distribution that closely approximates the normal distribution via the central limit theorem. The mean of a sample distribution approximates the mean of the population it was sampled from. By calculating a confidence interval for this mean we can estimate a 95\% confidence interval for the population of:
+In order to evaluate a confidence interval from these non-standard distributions a Bootstrapping method is used. As shown in fig.\ref{fig:three} by resampling our data and plotting the means we get a distribution that closely approximates the normal distribution via the central limit theorem. The mean of a sample distribution approximates the mean of the population it was sampled from. By calculating a confidence interval for this mean we can estimate a 95\% confidence interval for the population of:\footnote{At 3 significant figures the students t test yields the same confidence intervals, for applications where accuracy is only required at this level the students t test or normal approximation is sufficient.}
 
-% latex table generated in R 3.2.1 by xtable 1.7-4 package
-% Sun Oct 25 20:20:03 2015
+% latex table generated in R 3.2.2 by xtable 1.8-0 package
+% Thu Nov 05 10:13:38 2015
 \begin{table}[ht]
 \centering
 \begin{tabular}{rrr}
   \hline
   \hline
 SizeConfidence & 1.69 & 1.99 \\ 
-  TimeConfidence & 8.60 & 10.17 \\ 
+  TimeConfidence & 8.61 & 10.17 \\ 
    \hline
 \end{tabular}
-\caption{Bootstrapped 95 percent confidence intervals} 
+\caption{Bootstrapped confidence intervals \\ for the mean (95 percent)} 
 \end{table}
-\section{Codependency}
+\subsection{Codependency and Time intervals}
 
-The central figure above shows a scatter of size of fish and time of day. It is hard to identify any dependencies in the data visually but it looks as though it may be slightly weakly correlated. After numerical analysis we can see a covariance of -0.78 and a Pearson product-moment correlation of -0.13.
 
-The correlation is very weak but one explanation could be that you would expect the bigger fish to be easier to catch, therefore the population of bigger fish in the water shrinks over the course of the day. We would need more domain knowledge to conclude an effect like this. For instance if the fishing is taking place over a larger area (larger population of fish) then the fish caught early in the day will have quite a small effect on the ammount left at the end of the day. 
 
-\section{Intervals}
+\begin{wrapfigure}[12]{ht}{6cm}
+  \includegraphics[width=0.9\linewidth]{figure4.jpg}
+  \caption{Mean size of fish caught Hourly}
+  \label{fig:three}
+\end{wrapfigure}
+
+Visually Figure 1 (bottom left), showing a scatter plot of time of fish vs size of day demonstrates no obvious correlation between time of catch and size of catch. The covariance between the variables is -0.78, this is difficult to interpret so we use a Pearson product-moment correlation yielding, -0.13 (0.95 \% CI: -0.26 to 0.01).
+
+The correlation is very weak (0.1-0.3), and the 95\% interval overlaps 0 so there is not enough evidence to claim a relationship but one explanation of weak correlation could be that you would expect the bigger fish to be easier to catch, therefore the population of bigger fish in the water shrinks over the course of the day. However considering the size of the space fishing boats typically fish in any effect like this is likely neglibible.  
+
+
+We can also use a linear regression model yields $ y = -0.02x + 2.07 $, with a p value of 0.704 which is typically too high to reject the null hypothesis. Similarly the 95\% confidence intervals overlap 0. 
 
 Splitting the times into 24 intevals corresponding to each hour of the day we can show the interval of time with the highest rate of catch is 12:00 to  13:00. The interval with the largest average size of fish caught is 21:00 to 22:00. 
 
-Although this period has the largest average size of fish caught, it is not what would be initially expected considering the negative correlation calcualted. If each interval is inspected individually, this is an outlier to the general trend in which that the first third of the day averages around 2 and the last half the day is almsot entirely below 2 (with 2 exceptions). 
 \end{document}
