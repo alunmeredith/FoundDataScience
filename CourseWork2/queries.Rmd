@@ -1,0 +1,99 @@
+---
+title: "Queries"
+author: "Alun"
+date: "10 December 2015"
+output: html_document
+---
+Considering the problems encountered with converting to BSON and uploading. I saved preprocessing product as a csv and upload it manually with the mongo terminal. 
+```{}
+mongoimport "CW2-Dataset.csv" --type "CSV" --headerline --db --upsertDataScienceCoursework --collection microBlogData
+use DataScienceCoursework
+```
+
+```{r Libraries, message = FALSE, echo=FALSE, cache=TRUE}
+# Install / load libraries
+if(!require(packrat)) {
+  install.packages("packrat")
+  library(packrat)
+}
+if(!require(dplyr)) {
+  install.packages("dplyr")
+  library(dplyr)
+}
+if(!require(rmongodb)) {
+  install.packages("rmongodb")
+  library(rmongodb)
+}
+if(!require(knitr)) {
+  install.packages("knitr")
+  library(knitr)
+}
+```
+```{r setup defaults, echo=FALSE}
+knitr::opts_knit$set(cache=T)
+```
+
+Initialise connection to mongoDB. 
+```{r connect}
+library(rmongodb)
+
+dbse = "DataScienceCoursework"
+nspse = paste(dbse, "microBlogData", sep = ".")
+mongo <- mongo.create(db = dbse)
+mongo.is.connected(mongo)
+```
+
+### Query 1: How many distinct users are there
+For these first two queries NA values aren't included as unique users so we don't have to worry about not including them. And as shown previously the conversion from negative to positive hasn't impacted the number of unique users. 
+First the mongo shell solution:
+```{}
+db.microBlogData.distinct( "id_member" ).length
+// Result = 12065
+```
+And the R/rmongodb solution
+```{r Query1}
+res <- mongo.distinct(mongo, nspse, "id_member")
+length(res)
+```
+
+### Query 2.How many tweets did the top 10% of users publish
+
+Mongo Shell:
+```{}
+var top10 = db.microBlogData.aggregate(
+	{
+		$group: {_id : "$id_member", total : { $sum : 1}}
+	},
+	{
+		$sort: {total : -1}
+	},
+	{
+		$limit: 10
+	},
+	{
+		$group: { _id : null, top10 : { $sum: "$total"}}
+	}
+)
+// 32344
+```
+R/rmongoDB solution:
+```{r Query 2}
+# Define each pipe query and turn to BSON
+pipe_1 <- mongo.bson.from.JSON('{"$group":{"_id":"$id_member", "total":{"$sum":1}}}')
+pipe_2 <- mongo.bson.from.JSON('{"$sort":{"total":-1}}')
+pipe_3 <- mongo.bson.from.JSON('{"$limit":10}')
+pipe_4 <- mongo.bson.from.JSON('{"$group" : { "_id" : null, "top10" : { "$sum": "$total"}}}')
+# Stitch Queries together
+cmd_list <- list(pipe_1, pipe_2, pipe_3, pipe_4)
+# Evaluate quereis
+res <- mongo.aggregation(mongo, nspse, cmd_list)
+# Transform result into R object
+rRes <- mongo.bson.to.Robject(res)
+
+# Count total number of tweets
+total <- mongo.count(mongo, nspse)
+
+# calculate percentage
+(rRes$result$`0`$top10 / total)*100
+```
+
