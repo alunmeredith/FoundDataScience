@@ -1,0 +1,147 @@
+---
+title: "Data Pipeline Coursework"
+author: "Alun"
+date: "8 December 2015"
+output: html_document
+---
+```{r Libraries, message = FALSE, echo=FALSE, cache=TRUE}
+# Install / load libraries
+if(!require("packrat")) {
+  install.packages("packrat")
+  library(packrat)
+}
+if(!require("dplyr")) {
+  install.packages("dplyr")
+  library(dplyr)
+}
+if(!require("rmongodb")) {
+  install.packages("rmongodb")
+  library(rmongodb)
+}
+if(!require("knitr")) {
+  install.packages("knitr")
+  library(knitr)
+}
+```
+```{r setup defaults, echo=FALSE}
+knitr::opts_knit$set(cache=T)
+```
+
+First download the file from the url and read it into R. Inspecting the head and structure of the resultant dataframe. Save a raw file seperate from the current working copy in the workspace. (note I had some problems downloading this directly with R through the url, I expect I was using the wrong download method)
+
+I have read the csv using colClasses = "character" this is because some of the data fields have misplaced data of incorrect types and many are considered factor variables so I prefer to set the type manually when more easily availible. 
+
+Finally I have added a variable "anom" which tracks which data entries I considered anomalous and can be subset later. For example if something is deleted it is simply marked as such and given a "DELETED" value. Note this has two compromises 1. it bloats the dataset with documents that will likely not be used. 2. It means users have to subset properly when running queries which in a large organisation would likely lead to human errors.  
+```{r Download Raw data, cache=TRUE}
+# Download the file
+filename <- "CW2-Dataset.csv"
+if (!file.exists(filename)) {
+  download.file("http://www.edshare.soton.ac.uk/id/document/289603", filename)
+  unzip(filename)
+}
+
+# Read the data (as character because invalid values exist)
+mongoDataRaw <- read.csv("CW2-Dataset.csv", colClasses = "character")
+# Quick summaries of the data
+str(mongoDataRaw)
+summary(mongoDataRaw)
+
+# Add a variable to track anomoly detection and save the raw data
+mongoData <- mongoDataRaw
+mongoData$anom <- NA
+```
+## Perform some basic preprocessing
+For the preprocessing I go through each variable one at a time and try to find values outside the accepted range. For this exercise I have only really considered the extreme values rather than values inside the accepted set which could be found to be anomalous, only punctuation tweets for example.
+
+### Id
+Before type conversion can occur the values of each variable must be consistentant. For id there are no NA values but we don't expect any characters that are outside 0-9 range, however as this was initially reported as a factor variable we know that isn't the case. So we use a regular expression to find data which is not numeric in this field and visually inspect. 
+```{r anomoly detection, cache=TRUE}
+# id
+ind <- grep("[^0-9]", mongoData$id)
+deleteInd <- grep("^ $|^---$", mongoData$id)
+
+# Move values and clean what's left
+mongoData[ind, c("text","geo_lat","geo_lng")] <- NA
+mongoData[ind, c("text","geo_lat","geo_lng")] <- select(mongoData[ind,],id:timestamp)
+mongoData[ind, c("id","id_member","timestamp")] <- NA
+mongoData[ind, "anom"] <- "ONLY TEXT"
+# Delete "---" and "" id values
+mongoData[deleteInd,] <- NA
+mongoData[deleteInd, "anom"] <- "DELETED"
+# Label data with text and geo but no other variables
+geotxtInd <- grep("^$", mongoData[ind,]$geo_lat)
+mongoData[ind[geotxtInd], c("geo_lat", "geo_lng")] <- NA 
+mongoData[ind[geotxtInd], "anom"] <- "ONLY TEXT GEO"
+
+# All id values are now unique
+nrow(unique(mongoData$id)) - nrow(mongoData)
+```
+We see three classes of anomalous data if _id. In a few cases there the id field is blank or populated with '---' in which case we should discard these entries. In other cases there is text data in this field. After inspection the text data appears to be complete microblog posts so we can still use these values for the queries 5, 6, and 7. And finally in some cases the text and coordinate data is maintained but other data missing. These are still relevent for queries 5,6,7 and 8. Note for these latter two cases the information is stored in the wrong column so their values had to be moved. By recalling the summary now we can see that all the data is now numeric (besides the NAs we introduced) and in the same range (e17-e19). `r summary(as.numeric(mongoData$id))`  
+ 
+## Type conversion
+Now many of the variables can be changed to their correct tpe, including a date type called POSIXct which is interpreted by mongodb as a date type when passed through the rmongodb package. 
+```{r Type conversion, cache=TRUE}
+# Convert to correct data types these are parsed by mongodb
+# Convert to POSIXlt because rmongodb automatically processes this when exporting 
+mongoData$id <- as.numeric(mongoData$id)
+mongoData$id_member <- as.numeric(mongoData$id_member)
+mongoData$timestamp <- as.POSIXct(mongoData$timestamp, "UTC")
+mongoData$geo_lat <- as.numeric(mongoData$geo_lat)
+mongoData$geo_lng <- as.numeric(mongoData$geo_lng)
+```
+## Id member
+Some id member values are written as negative. There are ``r length(unique(mongoData[mongoData$id_member < 0, ]$id_member))` unique users who are negative. However none of those user IDs have also been taken as positive values so the user id's are converted to positive. Some id numbers take an unusually low value min (`r min(mongoData$id_member) `) but the other values don't seem odd on inspection and we expect some very old users to exist with low user ids. In general having negative values here doesn't seem like it would hurt anyone since we won't run queries based on these other than a grouping mechanism. 
+```{r id_member, cache=T}
+# Check that there is no overlap between absolute value user names. 
+length(unique(abs(mongoData$id_member))) - length(unique(mongoData$id_member))
+mongoData[((mongoData$id_member < 0) & !is.na(mongoData$id_member))==TRUE, "anom"] <- "ID NEGATIVE"
+mongoData$id_member <- abs(mongoData$id_member)
+```
+## TimeStamp
+All the timestamp data was successfully converted to POSIct type earlier so the format is correct for all non-NA data. We can see from the boxplot that the tweets started recording late on June 22 and ended on Jun 30th so we don't expect to see values outside this range. Which is what is observed with a min of `r min(mongoData$timestamp)` and a max of `r max(mongoData$timestamp)`.
+```{r timestamp, cache=T}
+breakpoints <- seq(as.POSIXlt("2014-06-20 00:00:00", "UTC"), as.POSIXlt("2014-07-03 23:59:59", "UTC"), "hour")
+hist(mongoData$timestamp, breaks = breakpoints)
+```
+## Latitude and longitude
+Latitude coordinates are generally given as degrees varying from 0 - 90. Longitude is given as -180 to 180 degrees east to west. So we expect the data to be in that range. 
+```{r Coordinates, cache=T}
+mongoData[,c("geo_lng", "geo_lat")] %>% summary()
+```
+What we see is that the values do not vary much at all and correspond closely with the coordinates of the UK. The non-varying longitude is supported by the day/night structure of the histogram of tweets per hour given above. We can now see that this data was taken from twitter during the period of a week (Jun22-30 2014) from users geo-located to the UK.  The presence of longitudinal coordinates in the -7 degrees and latitudes up to 60degrees suggests northern ireland and schotland are included in this range. 
+
+## Text
+Finally we check the summary statistics and see that all values with NA fields have the same number (number we introduced earlier) so there are no other NA values which have been missed. For the text field it is very difficult to assess something as certainly anomalous as values are inputted by the user but we do know that the character lengths have a limit of 1 - 140. 
+```{r text, cache=T}
+characterLengths <- sapply(mongoData$text, nchar)
+summary(characterLengths)
+```
+We can see that no fields are empty (minimum length is `r min(characterLengths)`) but the maximum is `r max(characterLengths)` rather than 240. There are 506 entries longer than 240 and they seem to all have non-standard characters which suggests that they were written in another language and converted to these characters leading to their length. It is quite hard to identify these kinda of tweets apart from ones where people have purposely written a lot of non alpha-numeric characters and they are otherwise still tweets so they will be left as-is but to be aware there are biases introduced here. I.e. in the unigram and bigram strings non-english words will not be shown. 
+
+
+Pre-processing is complete so we convert the data frame into a BSON format and send it to our mongoDB localhost. This takes a long time and is very high memory requirement so in future I would use the mongo buffer functionality to more modularly, flexibly and reliably complete this task. 
+```{r insert data into mongodb, cache=TRUE}
+# create BSON batch object
+dataList <- list()
+dataList <- apply( (mongoData), 1, function(x) c( dataList, x ) )
+dataBson2 <- lapply( dataList, function(x) mongo.bson.from.list(as.list(x)) )
+
+# Make a connection to mongodb and test that connection
+mongo <- mongo.create(db = "DataScienceCoursework")
+mongo.is.connected(mongo)
+
+# If we don't already have the collection stored add it to collections
+ns <- "DatScienceCoursework.preProcessed"
+if( (mongo.is.connected(mongo) == TRUE) & !(ns %in% mongo.get.database.collections(mongo, "DataScienceCoursework")) ){
+  mongo.insert.batch(mongo, ns, dataBson2 )
+}
+```
+
+```{r Drop connection, echo=FALSE}
+if(mongo.is.connected(mongo) == TRUE){
+  mongo.drop(mongo, ns)
+  mongo.drop.database(mongo,"DataScienceCourseWork")
+
+  mongo.destroy(mongo)
+  }
+```

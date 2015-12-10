@@ -1,0 +1,18 @@
+---
+title: "Shell Commands"
+author: "Alun"
+date: "9 December 2015"
+output: html_document
+---
+
+
+## Importing the data
+```{r}
+mongoimport "CW2-Dataset.csv" --type "CSV" --headerline --db DataScienceCoursework --collection microBlogData
+```
+
+## 
+```{r}
+use DataScienceCoursework
+use microBlogData
+```

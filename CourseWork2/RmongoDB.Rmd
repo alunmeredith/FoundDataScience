@@ -1,0 +1,23 @@
+---
+title: "mongoDB"
+author: "Alun"
+date: "9 December 2015"
+output: html_document
+---
+
+
+
+```{r make connection}
+# Make a connection to mongodb and test that connection
+if(!require(rmongodb)){
+  install.packages("rmongodb")
+  library(rmongodb)
+}
+mongo <- mongo.create()
+mongo.is.connected(mongo)
+```
+
+
+```{r}
+
+```
