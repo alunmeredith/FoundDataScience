@@ -1,0 +1,18 @@
+---
+title: "Architecture/Cleaning"
+author: "Alun"
+date: "11 December 2015"
+output: pdf_document
+---
+
+Below is a link to my github page and documents relating to preprocessing and querying of the data written in r markdown which can also be found on the github page. 
+
+[Github Page](https://github.com/alunmeredith/FoundDataScience/tree/master/CourseWork2)
+[Data Preprocessing](http://rpubs.com/alunmeredith/134413)
+
+The pipeline of the data was the following processes: 
+  * Downloading and extracting the data
+  * Type conversion of file types
+  * Moving tweets and coordinates found in the wrong variable to the correct place, replacing with NA values.
+  * Changing negative values for "id_member" to positive equivalent. 
+      - asdf
