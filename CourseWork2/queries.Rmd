@@ -6,7 +6,7 @@ output: html_document
 ---
 Considering the problems encountered with converting to BSON and uploading. I saved preprocessing product as a csv and upload it manually with the mongo terminal. 
 ```{}
-mongoimport "CW2-Dataset.csv" --type "CSV" --headerline --db --upsertDataScienceCoursework --collection microBlogData
+mongoimport "mongoData.csv" --type "CSV" --headerline --db DataScienceCoursework --collection microBlogData
 use DataScienceCoursework
 ```
 
@@ -48,7 +48,7 @@ For these first two queries NA values aren't included as unique users so we don'
 First the mongo shell solution:
 ```{}
 db.microBlogData.distinct( "id_member" ).length
-// Result = 12065
+// Result = 119232
 ```
 And the R/rmongodb solution
 ```{r Query1}
@@ -88,12 +88,38 @@ cmd_list <- list(pipe_1, pipe_2, pipe_3, pipe_4)
 # Evaluate quereis
 res <- mongo.aggregation(mongo, nspse, cmd_list)
 # Transform result into R object
-rRes <- mongo.bson.to.Robject(res)
-
+top10 <- mongo.bson.to.Robject(res)
+top10
 # Count total number of tweets
 total <- mongo.count(mongo, nspse)
 
 # calculate percentage
-(rRes$result$`0`$top10 / total)*100
+(top10$result$`0`$top10 / total)*100
+```
+### Query3:  What was the earliest and latest date (YYYY-MM-DD HH:MM:SS) that a message was published?
+
+```{r Query 3}
+#First
+first <- mongo.find.all(mongo, nspse, fields = '{"timestamp":1}', 
+                       sort = '{"timestamp":1}',
+                       limit = 1L)[[1]]$timestamp
+#Last
+last <- mongo.find.all(mongo, nspse, fields = '{"timestamp":1}',
+                       query = '{"timestamp" : { "$ne" : "NA" }}',
+                       sort = '{"timestamp":-1}',
+                       limit = 1L)[[1]]$timestamp
+first
+last
 ```
 
+### Query 4: What is the mean delta time between the messages. 
+Mean delta time is the total time between messages in seconds divided by the number of messages - 1. 
+```{r Query 4}
+timeTotal <- as.integer(as.POSIXct(last, tz = "UTC")) - as.integer(as.POSIXct(first, tz = "UTC"))
+deltaMean <- timeTotal / (mongo.count(mongo, nspse) -1 )
+deltaMean
+```
+
+```{r Query 5}
+
+```

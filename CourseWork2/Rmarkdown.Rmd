@@ -2,7 +2,7 @@
 title: "Data Pipeline Coursework"
 author: "Alun"
 date: "8 December 2015"
-output: html_document
+output: pdf_document
 ---
 ```{r Libraries, message = FALSE, echo=FALSE, cache=TRUE}
 # Install / load libraries
@@ -120,28 +120,35 @@ We can see that no fields are empty (minimum length is `r min(characterLengths)`
 
 
 Pre-processing is complete so we convert the data frame into a BSON format and send it to our mongoDB localhost. This takes a long time and is very high memory requirement so in future I would use the mongo buffer functionality to more modularly, flexibly and reliably complete this task. 
-```{r insert data into mongodb, cache=TRUE}
+
+```{r save to csv, echo=F}
+write.csv(mongoData, "mongoData.csv")
+```
+```{r insert data into mongodb, cache=TRUE, echo=F}
+### I had problems with my BSON object having errors uploading to mongodb so instead we save to csv
 # create BSON batch object
-dataList <- list()
-dataList <- apply( (mongoData), 1, function(x) c( dataList, x ) )
-dataBson2 <- lapply( dataList, function(x) mongo.bson.from.list(as.list(x)) )
+#dataList <- list()
+#dataList <- apply( (mongoData), 1, function(x) c( dataList, x ) )
+#dataBson <- lapply( dataList, function(x) mongo.bson.from.list(as.list(x)) )
 
 # Make a connection to mongodb and test that connection
-mongo <- mongo.create(db = "DataScienceCoursework")
-mongo.is.connected(mongo)
+#mongo <- mongo.create(db = "DataScienceCoursework")
+#mongo.is.connected(mongo)
 
 # If we don't already have the collection stored add it to collections
-ns <- "DatScienceCoursework.preProcessed"
-if( (mongo.is.connected(mongo) == TRUE) & !(ns %in% mongo.get.database.collections(mongo, "DataScienceCoursework")) ){
-  mongo.insert.batch(mongo, ns, dataBson2 )
-}
-```
+#ns <- "DatScienceCoursework.preProcessed"
+#for (i in 1:length(dataBson)){}
 
-```{r Drop connection, echo=FALSE}
-if(mongo.is.connected(mongo) == TRUE){
-  mongo.drop(mongo, ns)
-  mongo.drop.database(mongo,"DataScienceCourseWork")
+#if( (mongo.is.connected(mongo) == TRUE) & !(ns %in% mongo.get.database.collections(mongo, "DataScienceCoursework")) ){
+#  mongo.insert.batch(mongo, ns, dataBson2 )
+#}
+#```
 
-  mongo.destroy(mongo)
-  }
+#```{r Drop connection, echo=FALSE}
+#if(mongo.is.connected(mongo) == TRUE){
+#  mongo.drop(mongo, ns)
+#  mongo.drop.database(mongo,"DataScienceCourseWork")
+
+#  mongo.destroy(mongo)
+#  }
 ```

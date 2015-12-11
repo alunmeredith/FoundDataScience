@@ -69,7 +69,7 @@ img {
 
 
 <p>Considering the problems encountered with converting to BSON and uploading. I saved preprocessing product as a csv and upload it manually with the mongo terminal.</p>
-<pre><code>mongoimport &quot;CW2-Dataset.csv&quot; --type &quot;CSV&quot; --headerline --db --upsertDataScienceCoursework --collection microBlogData
+<pre><code>mongoimport &quot;mongoData.csv&quot; --type &quot;CSV&quot; --headerline --db DataScienceCoursework --collection microBlogData
 use DataScienceCoursework</code></pre>
 <p>Initialise connection to mongoDB.</p>
 <pre class="r"><code>library(rmongodb)
@@ -83,11 +83,11 @@ mongo.is.connected(mongo)</code></pre>
 <h3>Query 1: How many distinct users are there</h3>
 <p>For these first two queries NA values aren’t included as unique users so we don’t have to worry about not including them. And as shown previously the conversion from negative to positive hasn’t impacted the number of unique users. First the mongo shell solution:</p>
 <pre><code>db.microBlogData.distinct( &quot;id_member&quot; ).length
-// Result = 12065</code></pre>
+// Result = 119232</code></pre>
 <p>And the R/rmongodb solution</p>
 <pre class="r"><code>res &lt;- mongo.distinct(mongo, nspse, &quot;id_member&quot;)
 length(res)</code></pre>
-<pre><code>## [1] 120605</code></pre>
+<pre><code>## [1] 119232</code></pre>
 </div>
 <div id="query-2.how-many-tweets-did-the-top-10-of-users-publish" class="section level3">
 <h3>Query 2.How many tweets did the top 10% of users publish</h3>
@@ -107,6 +107,7 @@ length(res)</code></pre>
     }
 )
 // 32344</code></pre>
+<p>R/rmongoDB solution:</p>
 <pre class="r"><code># Define each pipe query and turn to BSON
 pipe_1 &lt;- mongo.bson.from.JSON('{&quot;$group&quot;:{&quot;_id&quot;:&quot;$id_member&quot;, &quot;total&quot;:{&quot;$sum&quot;:1}}}')
 pipe_2 &lt;- mongo.bson.from.JSON('{&quot;$sort&quot;:{&quot;total&quot;:-1}}')
@@ -117,14 +118,50 @@ cmd_list &lt;- list(pipe_1, pipe_2, pipe_3, pipe_4)
 # Evaluate quereis
 res &lt;- mongo.aggregation(mongo, nspse, cmd_list)
 # Transform result into R object
-rRes &lt;- mongo.bson.to.Robject(res)
-
-# Count total number of tweets
+top10 &lt;- mongo.bson.to.Robject(res)
+top10</code></pre>
+<pre><code>## $result
+## $result$`0`
+## $result$`0`$`_id`
+## NULL
+## 
+## $result$`0`$top10
+## [1] 32344
+## 
+## 
+## 
+## $ok
+## [1] 1</code></pre>
+<pre class="r"><code># Count total number of tweets
 total &lt;- mongo.count(mongo, nspse)
 
 # calculate percentage
-(rRes$result$`0`$top10 / total)*100</code></pre>
-<pre><code>## [1] 2.213809</code></pre>
+(top10$result$`0`$top10 / total)*100</code></pre>
+<pre><code>## [1] 2.214531</code></pre>
+</div>
+<div id="query3-what-was-the-earliest-and-latest-date-yyyy-mm-dd-hhmmss-that-a-message-was-published" class="section level3">
+<h3>Query3: What was the earliest and latest date (YYYY-MM-DD HH:MM:SS) that a message was published?</h3>
+<pre class="r"><code>#First
+first &lt;- mongo.find.all(mongo, nspse, fields = '{&quot;timestamp&quot;:1}', 
+                       sort = '{&quot;timestamp&quot;:1}',
+                       limit = 1L)[[1]]$timestamp
+#Last
+last &lt;- mongo.find.all(mongo, nspse, fields = '{&quot;timestamp&quot;:1}',
+                       query = '{&quot;timestamp&quot; : { &quot;$ne&quot; : &quot;NA&quot; }}',
+                       sort = '{&quot;timestamp&quot;:-1}',
+                       limit = 1L)[[1]]$timestamp
+first</code></pre>
+<pre><code>## [1] &quot;2014-06-22 23:00:00&quot;</code></pre>
+<pre class="r"><code>last</code></pre>
+<pre><code>## [1] &quot;2014-06-30 21:59:59&quot;</code></pre>
+</div>
+<div id="query-4-what-is-the-mean-delta-time-between-the-messages." class="section level3">
+<h3>Query 4: What is the mean delta time between the messages.</h3>
+<p>Mean delta time is the total time between messages in seconds divided by the number of messages - 1.</p>
+<pre class="r"><code>timeTotal &lt;- as.integer(as.POSIXct(last, tz = &quot;UTC&quot;)) - as.integer(as.POSIXct(first, tz = &quot;UTC&quot;))
+deltaMean &lt;- timeTotal / (mongo.count(mongo, nspse) -1 )
+deltaMean</code></pre>
+<pre><code>## [1] 0.470786</code></pre>
 </div>
 
 
