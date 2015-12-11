@@ -120,7 +120,7 @@ We can see that no fields are empty (minimum length is `r min(characterLengths)`
 
 Pre-processing is complete so we convert the data frame into a BSON format and send it to our mongoDB localhost. This takes a long time and is very high memory requirement so in future I would use the mongo buffer functionality to more modularly, flexibly and reliably complete this task. 
 
-```{r save to csv, echo=F}
+```{r save to csv}
 str(mongoData, nchar.max = 20, strict.width = "cut")
 summary(mongoData)
 write.csv(mongoData, "mongoData.csv")

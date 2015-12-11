@@ -166,6 +166,7 @@ summary(characterLengths)</code></pre>
 ##    1.00   40.00   66.00   72.51  104.00  250.00</code></pre>
 <p>We can see that no fields are empty (minimum length is 1) but the maximum is 250 rather than 240. There are 506 entries longer than 240 and they seem to all have non-standard characters which suggests that they were written in another language and converted to these characters leading to their length. It is quite hard to identify these kinda of tweets apart from ones where people have purposely written a lot of non alpha-numeric characters and they are otherwise still tweets so they will be left as-is but to be aware there are biases introduced here. I.e. in the unigram and bigram strings non-english words will not be shown.</p>
 <p>Pre-processing is complete so we convert the data frame into a BSON format and send it to our mongoDB localhost. This takes a long time and is very high memory requirement so in future I would use the mongo buffer functionality to more modularly, flexibly and reliably complete this task.</p>
+<pre class="r"><code>str(mongoData, nchar.max = 20, strict.width = &quot;cut&quot;)</code></pre>
 <pre><code>## 'data.frame':    1460535 obs. of  7 variables:
 ##  $ id       : num  4.82e+17 4.82e+17 4.82e+17 4.82e+17 4.82e+17 ...
 ##  $ id_member: num  2.36e+08 2.24e+08 4.37e+08 9.89e+08 4.10e+08 ...
@@ -174,6 +175,7 @@ summary(characterLengths)</code></pre>
 ##  $ geo_lat  : num  53.2 51.7 51.9 53.4 52.7 ...
 ##  $ geo_lng  : num  -3.2 -0.407 -0.452 -3.118 0.98 ...
 ##  $ anom     : chr  NA NA NA NA ...</code></pre>
+<pre class="r"><code>summary(mongoData)</code></pre>
 <pre><code>##        id              id_member           timestamp                  
 ##  Min.   :4.808e+17   Min.   :8.550e+02   Min.   :2014-06-22 23:00:00  
 ##  1st Qu.:4.816e+17   1st Qu.:4.742e+07   1st Qu.:2014-06-24 21:49:14  
@@ -190,6 +192,7 @@ summary(characterLengths)</code></pre>
 ##                     3rd Qu.:53.43   3rd Qu.:-0.1734                     
 ##                     Max.   :59.32   Max.   : 1.8607                     
 ##                     NA's   :674     NA's   :674</code></pre>
+<pre class="r"><code>write.csv(mongoData, &quot;mongoData.csv&quot;)</code></pre>
 </div>
 
 
