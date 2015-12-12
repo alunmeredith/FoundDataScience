@@ -109,7 +109,7 @@ length(res)</code></pre>
 // 32344</code></pre>
 <p>R/rmongoDB solution:</p>
 <pre class="r"><code># Define each pipe query and turn to BSON
-pipe_1 &lt;- mongo.bson.from.JSON('{&quot;$group&quot;:{&quot;_id&quot;:&quot;$id_member&quot;, &quot;total&quot;:{&quot;$sum&quot;:1}}}')
+pipe_1 &lt;- mongo.bson.from.JSON('{&quot;$group&quot;:{&quot;_id&quot;:&quot;$id_member&quot;,&quot;total&quot;:{&quot;$sum&quot;:1}}}')
 pipe_2 &lt;- mongo.bson.from.JSON('{&quot;$sort&quot;:{&quot;total&quot;:-1}}')
 pipe_3 &lt;- mongo.bson.from.JSON('{&quot;$limit&quot;:10}')
 pipe_4 &lt;- mongo.bson.from.JSON('{&quot;$group&quot; : { &quot;_id&quot; : null, &quot;top10&quot; : { &quot;$sum&quot;: &quot;$total&quot;}}}')
@@ -157,11 +157,102 @@ first</code></pre>
 </div>
 <div id="query-4-what-is-the-mean-delta-time-between-the-messages." class="section level3">
 <h3>Query 4: What is the mean delta time between the messages.</h3>
-<p>Mean delta time is the total time between messages in seconds divided by the number of messages - 1.</p>
-<pre class="r"><code>timeTotal &lt;- as.integer(as.POSIXct(last, tz = &quot;UTC&quot;)) - as.integer(as.POSIXct(first, tz = &quot;UTC&quot;))
-deltaMean &lt;- timeTotal / (mongo.count(mongo, nspse) -1 )
+<p>Mean delta time is the total time between messages in seconds divided by the number of messages - 1. Convert first and last time data to posixct and then do an integer typed subtraction.</p>
+<pre class="r"><code>timeTotal &lt;- as.integer(as.POSIXct(last, tz=&quot;UTC&quot;)) - as.integer(as.POSIXct(first, tz = &quot;UTC&quot;))
+deltaMean &lt;- timeTotal / (mongo.count(mongo, nspse) - 1 )
 deltaMean</code></pre>
 <pre><code>## [1] 0.470786</code></pre>
+<p>Queries 5-8 all apply to string manipulation so we use a cursor to save the text as an R object.</p>
+<pre class="r"><code>#text &lt;- mongo.find.all(mongo, nspse, fields = '{&quot;text&quot;:1}',data.frame = T)</code></pre>
+</div>
+<div id="query-5-get-the-mean-length-of-a-message" class="section level2">
+<h2>Query 5 get the mean length of a message</h2>
+<p>Create a cursor and calculate the sum of characters in each text field into a sum before dividing by non-na counts.</p>
+<pre class="r"><code>sum = 0
+cursor &lt;- mongo.find(mongo, nspse, fields = '{&quot;text&quot;:1}', 
+                     query = '{&quot;text&quot; : {&quot;$ne&quot; : &quot;NA&quot;}}')
+while (mongo.cursor.next(cursor)) {
+val &lt;- mongo.cursor.value(cursor)
+sum &lt;- sum + nchar(mongo.bson.value(val, &quot;text&quot;))
+}
+
+count &lt;- mongo.count(mongo, nspse, query = '{&quot;text&quot; : {&quot;$ne&quot; : &quot;NA&quot;}}')
+sum / count</code></pre>
+<pre><code>## [1] 72.50833</code></pre>
+</div>
+<div id="most-common-unigram-and-bigrams" class="section level2">
+<h2>Most common unigram and bigrams</h2>
+<p>The method here is to load the text into a cursor, split each ngram with the ‘ngram’ r package and save it in another collection. Finally use the group query to collect like unigrams together and sum them. Getting a very difficult error when I try to use bigrams instead of unigrams. In theory you jus tchang ethe value inside the get.ngrams function to 2. But mongodb doesn’t recogise some of the objects as bson.</p>
+<pre class="r"><code># cursor &lt;- mongo.find(mongo, nspse, fields = '{&quot;text&quot;:1}', 
+#                      query = '{&quot;text&quot; : {&quot;$ne&quot; : &quot;NA&quot;}}')
+# while (mongo.cursor.next(cursor)) {
+#   val &lt;- mongo.bson.value(mongo.cursor.value(cursor), &quot;text&quot;)
+#   ngram &lt;- get.ngrams(ngram(val, 1))
+#   sapply(ngram, function(x) {
+#     mongo.insert(mongo, &quot;DataScienceCoursework.unigrams&quot;,  
+#                  mongo.bson.from.list(as.list(x)))
+#   })
+# }</code></pre>
+<p>While I intended to save these to a mongodb colleciton, continuing buggs uploading a few of the data points meant I saved it as an R vector instead.</p>
+<pre class="r"><code># unigram = vector()
+# i = 1
+# cursor &lt;- mongo.find(mongo, nspse, fields = '{&quot;text&quot;:1}', 
+#                      query = '{&quot;text&quot; : {&quot;$ne&quot; : &quot;NA&quot;}}')
+# while (mongo.cursor.next(cursor)) {
+#   val &lt;- mongo.bson.value(mongo.cursor.value(cursor), &quot;text&quot;)
+#   ngram &lt;- get.ngrams(ngram(as.character(val), 1))
+#   sapply(ngram, function(x) {
+#     unigram[i] &lt;- x
+#   }
+# )
+#   i &lt;- i + 1
+#   }</code></pre>
+<pre class="r"><code># bigram = vector()
+# i = 1
+# cursor &lt;- mongo.find(mongo, nspse, fields = '{&quot;text&quot;:1}', 
+#                      query = '{&quot;text&quot; : {&quot;$ne&quot; : &quot;NA&quot;}}')
+# while (mongo.cursor.next(cursor)) {
+#   val &lt;- mongo.bson.value(mongo.cursor.value(cursor), &quot;text&quot;)
+#   ngram &lt;- get.ngrams(ngram(val, 1))
+#   sapply(ngram, function(x) {
+#     bigram[i] &lt;- x
+#     }
+#     )
+#   i &lt;- i + 1
+#   print(i)
+#   }</code></pre>
+</div>
+<div id="what-is-the-average-number-of-hashtags-used-within-a-message" class="section level2">
+<h2>What is the average number of hashtags (#) used within a message?</h2>
+<p>Similar query 5 but with counting hashtags instead of strings.</p>
+<pre class="r"><code>sum = 0
+cursor &lt;- mongo.find(mongo, nspse, fields = '{&quot;text&quot;:1}', 
+                     query = '{&quot;text&quot; : {&quot;$ne&quot; : &quot;NA&quot;}}')
+while (mongo.cursor.next(cursor)) {
+  val &lt;- mongo.bson.value(mongo.cursor.value(cursor), &quot;text&quot;)
+  sum &lt;- sum + str_count(val, &quot;#&quot;)
+}
+sum / count</code></pre>
+<pre><code>## [1] 0.3115135</code></pre>
+</div>
+<div id="query-8-which-area-of-the-uk-has-the-most-tweets." class="section level2">
+<h2>Query 8, which area of the UK has the most tweets.</h2>
+<p>Split the uk into a grid between -7.7:8.9 and 49:60</p>
+<pre class="r"><code># laSeq &lt;- seq(-7.7,8.9,0.1)
+# loSeq &lt;- seq(49,60,0.1)
+# cursor &lt;- mongo.find.all(mongo, nspse, 
+#                      fields = '{&quot;geo_lng&quot; : 1 , &quot;geo_lat&quot; : 1}')
+# while (mongo.cursor.next(cursor)) {
+#   for (i in seq_along(1:laSeq))
+#   {
+#     for (j in seq_along(1:loSeq)) 
+#       {
+#           lng &lt;- mongo.bson.value(mongo.cursor.value(cursor), &quot;geo_lng&quot;)
+#           lat &lt;- mongo.bson.value(mongo.cursor.value(cursor), &quot;geo_lat&quot;)
+#           if (lat &gt; i) &amp; &gt; (lng &gt; j)
+#       }
+#   }
+# }</code></pre>
 </div>
 
 

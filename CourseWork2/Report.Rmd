@@ -8,11 +8,23 @@ output: pdf_document
 Below is a link to my github page and documents relating to preprocessing and querying of the data written in r markdown which can also be found on the github page. 
 
 [Github Page](https://github.com/alunmeredith/FoundDataScience/tree/master/CourseWork2)
-[Data Preprocessing](http://rpubs.com/alunmeredith/134413)
+[Data Preprocessing](http://rpubs.com/alunmeredith/Pipeline)
+[Query Code](http://rpubs.com/alunmeredith/Coursework2)
 
 The pipeline of the data was the following processes: 
   * Downloading and extracting the data
   * Type conversion of file types
+      - Particulary important for time documents so that they can be interpretted properly by the r mongo exporter. 
   * Moving tweets and coordinates found in the wrong variable to the correct place, replacing with NA values.
+      - A number (approx 1000) entries were found to have tweets stored in their "id" field. This judged to be full tweets (and often coordinates) which had filled from the left of the database so ended up in the wrong columns. 
+      - They were moved to the correc tcolumns and empty values set to NA. 
   * Changing negative values for "id_member" to positive equivalent. 
-      - asdf
+      - This was done because it didn't affect the number of unique users.
+      - So hypothesisised that the error was in the sign not the number. 
+      - In maintained database situations you would have to be careful about the forward compatability of that assumption.
+
+wherever any changes were made they the action was stored in an additional field called "anom". This meant that all the data was retained and could be reintegrated or changed whenever the situation arrises. 
+
+It was the intention to pipe the dataset directly from R to mongodb using the 'rmongodb' package. This requires converting to BSON first and then uploading with an insert function. However there were sustained and robust errors concerning some entries not "being BSON" which crashed the uploads. 
+
+Attempts were made to export to mongoDb directly from R both as part of the data processing pipeline and the queries however the package interface seemed very buggy in this respect and I encountered a brick wall. The code written from these areas were left in so can still be observed. 
