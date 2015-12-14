@@ -2,4 +2,4 @@
 *.Rhistory
 *.RData
 *.csv
-
+Rmakrdown_cache/*
