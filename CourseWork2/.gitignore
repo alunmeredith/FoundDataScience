@@ -3,3 +3,9 @@
 *.RData
 *.csv
 Rmakrdown_cache/*
+preprocessing_cache/*
+queries_cache/*
+rsconnect/*
+preprocessing_files/*
+.RDataTmp
+.RDataTmp1
