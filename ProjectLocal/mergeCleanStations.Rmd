@@ -1,0 +1,142 @@
+Open libraries
+
+```{r libraries, message = F}
+library(rmongodb)
+library(dplyr)
+```
+
+### Downloading datasets
+The train usage statistics are downloaded as excel files and exported from excel to csv, then read into R below. To ensure that this operation works make sure the working directory has the exported csv files in it.
+This comes from 2 sources:
+
+  * Overground trains using Office of Ratio Regulation Report http://data.london.gov.uk/dataset/train-station-usage/resource/b23a39a1-f387-43ba-950a-19d1cfd8aab6.
+    * This data is primarily based on ticket sales in each station and Oyster Card usage after January 2010. 
+  * Underground data comes from TFL statistics http://www.tfl.gov.uk/cdn/static/cms/documents/multi-year-station-entry-and-exit-figures.xls.
+    * There is less information in the metadata about how these figures were produced it is assumed that it is based on oyster data as well but there are both discrepencies and weightings/estimates taking place. 
+    
+* The positional data for the trains is from http://www.doogal.co.uk/london_stations.php 
+    * This is a less reliable source because it isn't official but seems to be accurate. 
+    * This has already been uploaded to mongodb so must be downloaded again to clean. (as it is a small dataset)
+
+
+```{r downloading Data, results='hide'}
+# Read overground train data 
+trainUsage <- read.csv("station-usage.csv", stringsAsFactors = F)
+# Read underground train data
+tubeUsage <- read.csv("multi-year-station-entry-and-exit-figures.csv", skip=6, stringsAsFactors = F, strip.white = T)
+
+#------ Defining gloabl variables -----------
+DB <- "DSproject"
+CRIME <- paste(DB, "londonCrime", sep=".")
+STATIONS <- paste(DB, "stations", sep=".")
+
+
+# Create mongo connection
+if(exists("mongo")) try(mongo.destroy(mongo))
+mongo <<- mongo.create(host = "mongodb-dse662l3.cloudapp.net:27017", db = DB)
+
+
+# Download stations as a dataframe
+ifelse(mongo.is.connected(mongo), 
+       lstations <- mongo.find.all(mongo, STATIONS),
+       {
+         createMongo()
+         ifelse(mongo.is.connected(mongo),
+                lstations <- mongo.find.all(mongo, STATIONS),
+                stop("Could not connect to mongoDB"))
+       })
+stations <- data.frame(
+  Station = sapply(lstations, function(x) x$Station),
+  Latitude = sapply(lstations, function(x) x$Latitude),
+  Longitude = sapply(lstations, function(x) x$Longitude),
+  OS.X = sapply(lstations, function(x) x$OS.X),
+  OS.Y = sapply(lstations, function(x) x$OS.Y),
+  Zone = sapply(lstations, function(x) x$Zone),
+  Postcode = sapply(lstations, function(x) x$Postcode)
+)
+
+```
+
+### Cleaning the stations dataset
+* Setting the type
+* Fixing some anomalous naming (to match merging dataset)
+
+```{r Cleaning geoStations}
+# uploaded data is stored in strings so change the type of variables to be appropriate
+stations$Latitude <- as.numeric(stations$Latitude)
+stations$Longitude <- as.numeric(stations$Longitude)
+stations$OS.X <- as.numeric(stations$OS.X)
+stations$OS.Y <- as.numeric(stations$OS.X)
+stations$Zone <- as.factor(stations$Zone)
+stations$Station <- as.character(stations$Station)
+
+# Fix some discrepencies in station names
+stations$Station <- gsub("^Acton$", "Acton Main Line", stations$Station)
+stations$Station <- gsub("^Bank$", "Bank & Monument", stations$Station)
+stations$Station <- gsub(" and ", " & ", stations$Station, perl = T)
+stations$Station <- gsub("^Earls Court$", "Earl's Court", stations$Station)
+stations$Station <- gsub("Bakerloo", "Bak", stations$Station)
+stations$Station <- gsub("Circle/District/Hammersmith & City", "Cir", stations$Station)
+stations$Station <- gsub("District", "Dis", stations$Station)
+stations$Station <- gsub("Met.", "H&C", stations$Station)
+stations$Station <- gsub("1 2 3", "123", stations$Station)
+stations$Station <- gsub("^St Pancras$", "St.Pancras", stations$Station)
+str(stations, strict.width = "cut")
+```
+
+### Cleaning Data
+To clean the overground trains data select the relevant variables and the subset of the data in london. 
+We then change the names of the variables to be more readable and turn the comma seperated usage numbers into numeric type.
+```{r Cleaning overground trains}
+# Select relevent observations and variables
+trainUsage <- filter(trainUsage, Government.Office.Region..GOR. == "London")
+trainUsage <- select(trainUsage, Station.Name, District.or.Unitary.Authority, Station.Facility.Owner, X1415.Entries...Exits, Explanation.of.large.change)
+# Rename variables
+names(trainUsage) <- c("Station", "Borough", "Owner", "TicketUsage", "railComments")
+# Turn usage into a number (without commas)
+trainUsage$TicketUsage <- as.numeric(gsub(",","", trainUsage$TicketUsage))
+str(trainUsage, strict.width = "cut")
+```
+To clean the underground data we perform similar steps of selecting the relavent variables and filtering out some additional rows which are either empty or related to the "Total".
+Then the usage numbers are multiplied by 1000000 because they are in millions. 
+Finally the comments section is keyed so we replace the key values with the actual comments they refer to. 
+```{r Cleaning underground trains}
+# Select relevant variables
+tubeUsage <- select(tubeUsage, Station, million, Note)
+names(tubeUsage) <- c("Station", "EntryExitEst", "tubeComments")
+# Remove some NA rows and "Total" row
+tubeUsage <- filter(tubeUsage, !(Station == "Total"), !(Station == ""))
+# Convert usage to units (instead of millions)
+tubeUsage$EntryExitEst <- tubeUsage$EntryExitEst * 1000000
+# Change the key of tubeComments into their actual value
+tubeUsage$tubeComments <- gsub("^A$", "", tubeUsage$tubeComments)
+tubeUsage$tubeComments <- gsub("^B$", "Figures for Bank/Monument now exclude W&C line passengers interchanging with other lines", tubeUsage$tubeComments)
+tubeUsage$tubeComments <- gsub("^T$", "Figures include all passengers on the W&C line (which is closed on Sundays", tubeUsage$tubeComments)
+tubeUsage$tubeComments <- gsub("^N$", "Station Closed", tubeUsage$tubeComments)
+str(tubeUsage, strict.width = "cut")
+```
+
+
+### Merging trainUsage & Station 
+We first simply merge the three datasets together over the station name variable. Note that now some of the fields are sparse because not all stations are in both dataset. 
+
+We can observe that some stations have usage variables for both underground and rail datasets. 
+  * this is primarily when the station has both an overground and underground component for example waterloo station. For these stations we have chosen to use the rail usage simply because more information was availible about the process involved and it is more likely that it has a more complete picture because it does take into account both paper  tickets and oyster card so definitely factors in the tube part of those stations, whereas it is unclear if this is the case the other way around.
+We can observe some stations have no usage variables from either datasets.
+  * This is for one of two reasons, naming discrepency between the location dataset and those trying to be merged; we attempted to account for this when cleaning these datasets above but some may still remain. Secondly the small stations for the DLR and the tramlink aren't included. We keep this data because it can still have a relevant effect on crime but the NA values must be accounted for by the visualisation process. 
+Finally not all of the stations from the usage datasets are matched to those in the location datasets. These were stations that were quite far out of london so the curator of the location dataset considered it not to be a london station. As we do not have the location of these stations and it is questionable if they are in london or not we have chosen to ignore them (as is the default procedure of the script)
+```{r merging}
+mergedStations <- merge(stations, trainUsage, "Station", all.x = TRUE)
+mergedStations <- (merge(mergedStations, tubeUsage, "Station", all.x = TRUE))
+mergedStations <- mutate(mergedStations, usage = ifelse(!is.na(TicketUsage), TicketUsage, EntryExitEst))
+str(mergedStations, strict.width = "cut")
+```
+
+Finally we replace our stations dataset on mongodb with the merged stations data. 
+```{r upload, eval=FALSE}
+if(mongo.is.connected(mongo) == TRUE) {
+  bson <- mongo.bson.from.df(mergedStations)
+  mongo.drop(mongo, STATIONS)
+  mongo.insert.batch(mongo, STATIONS, bson) 
+}
+```
