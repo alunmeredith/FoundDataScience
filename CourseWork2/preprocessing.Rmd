@@ -22,28 +22,34 @@ if(!require("knitr")) {
   install.packages("knitr")
   library(knitr)
 }
+if(!require("hexbin")) {
+  install.packages("hexbin")
+  library(hexbin)
+}
 ```
 ```{r setup defaults, echo=FALSE}
 knitr::opts_knit$set(cache=T)
 ```
 
-First download the file from the url and read it into R. Inspecting the head and structure of the resultant dataframe. Save a raw file seperate from the current working copy in the workspace. (note I had some problems downloading this directly with R through the url, I expect I was using the wrong download method)
+First download the file from the url and read it into R. Inspecting the head and structure of the resultant dataframe. Save a raw file seperate from the current working copy in the workspace. (note I had some problems downloading this directly with R through the url, the downloaded file appeared corrupted; the code is left in regardless.)
 
-I have read the csv using colClasses = "character" this is because some of the data fields have misplaced data of incorrect types and many are considered factor variables so I prefer to set the type manually when more easily availible. 
+The function csv uses the ``colClasses = "character"` this is because some of the data fields have misplaced data of incorrect types and many are considered factor variables it is preferable to set the type manually when once these issues have been resolved. 
 
-Finally I have added a variable "anom" which tracks which data entries I considered anomalous and can be subset later. For example if something is deleted it is simply marked as such and given a "DELETED" value. Note this has two compromises 1. it bloats the dataset with documents that will likely not be used. 2. It means users have to subset properly when running queries which in a large organisation would likely lead to human errors.  
+Finally using the variable "anom" to track which data entries were considered anomalous. For example if something is deleted it is simply marked as such and given a "DELETED" value. Note this has two compromises 1. it bloats the dataset with documents that will likely not be used. 2. It means users have to subset properly when running queries which in a large organisation would likely lead to human errors. However it improves reproducibility and openness  
 ```{r Download Raw data, cache=TRUE}
 # Download the file
-filename <- "CW2-Dataset.csv"
+filename <- "microblogDataset_COMP6235_CW2.csv"
 if (!file.exists(filename)) {
   download.file("http://www.edshare.soton.ac.uk/id/document/289603", filename)
   unzip(filename)
 }
 
 # Read the data (as character because invalid values exist)
-mongoDataRaw <- read.csv("CW2-Dataset.csv", colClasses = "character")
-# Quick summaries of the data
-str(mongoDataRaw)
+mongoDataRaw <- read.csv("microblogDataset_COMP6235_CW2.csv", colClasses = "character")
+
+# Summaries of  the unprocessed data
+str(mongoDataRaw, nchar.max = 20, strict.width = "cut")
+summary(mongoDataRaw)
 
 # Add a variable to track anomoly detection and save the raw data
 mongoData <- mongoDataRaw
@@ -105,7 +111,8 @@ hist(mongoData$timestamp, breaks = breakpoints)
 ## Latitude and longitude
 Latitude coordinates are generally given as degrees varying from 0 - 90. Longitude is given as -180 to 180 degrees east to west. So we expect the data to be in that range. 
 ```{r Coordinates, cache=T}
-mongoData[,c("geo_lng", "geo_lat")] %>% summary()
+bin <- hexbin(mongoDataRaw$geo_lng, mongoDataRaw$geo_lat, xbins = 40)
+plot(bin)
 ```
 What we see is that the values do not vary much at all and correspond closely with the coordinates of the UK. The non-varying longitude is supported by the day/night structure of the histogram of tweets per hour given above. We can now see that this data was taken from twitter during the period of a week (Jun22-30 2014) from users geo-located to the UK.  The presence of longitudinal coordinates in the -7 degrees and latitudes up to 60degrees suggests northern ireland and schotland are included in this range. 
 

@@ -216,23 +216,33 @@ Split the uk into a grid between -7.7:8.9 and 49:60
 laSeq <- seq(-7.7,8.9,0.1)
 loSeq <- seq(49,60,0.1)
 index <- NULL
-cursor <- mongo.find.all(mongo, nspse, 
-                     fields = '{"geo_lng" : 1 , "geo_lat" : 1}')
+# Create a cursor of all longetude and latitude objects
+cursor <- mongo.find(mongo, nspse, fields = '{"geo_lng" : 1 , "geo_lat" : 1}')
+"cursor complete"
 while (mongo.cursor.next(cursor)) {
-  for (i in seq_along(1:laSeq))
+  for (i in seq_along(laSeq))
   {
-    for (j in seq_along(1:loSeq)) 
+    for (j in seq_along(loSeq)) 
       {
           lng <- mongo.bson.value(mongo.cursor.value(cursor), "geo_lng")
           lat <- mongo.bson.value(mongo.cursor.value(cursor), "geo_lat")
-          if ((lat > laSeq[i]) > (lat < laSeq[i+1]) & ( lng > loSeq[i] ) & (lng < loSeq[i+1])){
-            
-           print(i)
-            index$lat[i] <- laSeq[i]
-            index$loSeq[j] <- loSeq[j]
+          if (is.na(lat) &  is.na(lng))
+          {
+              if ((lat >= laSeq[i]) & (lat < laSeq[i+1]) & ( lng >= loSeq[i] ) & (lng < loSeq[i+1])){
+                print("saved")
+                index$lat[i] <- laSeq[i]
+                index$loSeq[j] <- loSeq[j]
+              }
           }
       }
   }
- }
+}
+mongo.cursor.destroy(cursor)
+```
+
+```{r}
+mongo2 <- mongo.create(db = "DatScienceCoursework")
+name <- "DatScienceCoursework.mtcars"
+cursor <- mongo.find.all(mongo, nspse, fields = '{"geo_lng" : 1 , "geo_lat" : 1}')
 
 ```
