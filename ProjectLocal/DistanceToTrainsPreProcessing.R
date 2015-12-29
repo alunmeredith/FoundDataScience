@@ -20,22 +20,23 @@
 
 
 library(rmongodb)
+library(dplyr)
 
 t0 <- Sys.time()
 
 #------ Defining gloabl variables ---------
 DB <- "DSproject"
-CRIME <- paste(DB, "londonCrime2", sep = ".")
+CRIME <- paste(DB, "test", sep = ".")
 STATIONS <- paste(DB, "stations", sep = ".")
 startTime <- Sys.time()
 mongo <- NA
 totalProcessed <- 0
-filesProcessed <- 4
+filesProcessed <- 0
 
 # Creating mongo connection
 createMongo <- function() {
   if (exists("mongo")) {
-      if (try(mongo.is.connected(mongo))) return(TRUE)
+      try(mongo.destroy(mongo))
   }
   mongo <<- mongo.create(host = "mongodb-dse662l3.cloudapp.net:27017", db = DB)
   return(mongo.is.connected(mongo))
@@ -83,15 +84,23 @@ stations$Latitude <- as.numeric(stations$Latitude)
 stations$Longitude <- as.numeric(stations$Longitude)
 stations$Station <- as.character(stations$Station)
 
+LSOA <- read.csv("OA11_LSOA11_MSOA11_LAD11_EW_LUv2.csv", stringsAsFactors = F)
+names(LSOA) <- c("OutputAreaCode", "LSOAcode", "LSOAname", "MSOAcode", "MSOAname", "LAcode", "LAname", "LAWelshName")
+
 t2 <- Sys.time()
-print(paste("Time to download trains data :", round(t2 - t1, 4), attr(t2 - t1, "units")))
+print(paste("Time to download trains / read LSOA data :", round(t2 - t1, 4), attr(t2 - t1, "units")))
 
 ### Preprocessing -------------
 # Generate array of files to process
 files <- list.files(path = "./../CrimeDV/DataProject/Datasets/NationalData", full.names = TRUE, recursive = TRUE)
-londonfiles <- grep( pattern = ("city-of-london-street|metropolitan-street|tbp-street"), files, value = TRUE)
+fileNames <- list.files(path = "./../CrimeDV/DataProject/Datasets/NationalData", full.names = FALSE, recursive = TRUE)
+londonfiles <- grep( pattern = ("city-of-london-street|metropolitan-street|btp-street"), files, value = TRUE)
+londonNames <- grep( pattern = ("city-of-london-street|metropolitan-street|btp-street"), fileNames, value = TRUE)
+londonNames <- gsub("^.*?/", "", londonNames)
 
-for (i in (filesProcessed + 1):length(londonfiles)) {
+#######################
+#for (i in (filesProcessed + 1):length(londonfiles)) {
+for (i in seq(3, 90, 3)) {
     t2a <- Sys.time()
     table <- read.csv(londonfiles[i])
     entries <- nrow(table)
@@ -103,53 +112,73 @@ for (i in (filesProcessed + 1):length(londonfiles)) {
     
     # Loop over every station for every crime in file
     processed <- apply(table, 1, function(x){
-    # Calculate distance to station  
-    distances <- apply(stations, 1, function(y) {
-    distRad(as.numeric(x["Latitude"]), as.numeric(x["Longitude"]),
-             as.numeric(y["Latitude"]), as.numeric(y["Longitude"]))    
-    })
-    
-    # Adding station distance and name dimensions to crime vector
-    index <- which.min(distances)
-    x["Station"] <- stations$Station[index]
-    kilometers <- distance(as.numeric(x["Latitude"]), as.numeric(x["Longitude"]),
-                           as.numeric(stations$Latitude[index]),
-                           as.numeric(stations$Longitude[index]))
-    x["StationDistance"] <- kilometers
-    # Check to ensure data is fit to be inserted into mongodb
-    return(x)
+        # Calculate distance to station  
+        distances <- apply(stations, 1, function(y) {
+            distRad(as.numeric(x["Latitude"]), as.numeric(x["Longitude"]),
+                     as.numeric(y["Latitude"]), as.numeric(y["Longitude"]))    
+        })
+        
+        # Adding station distance and name dimensions to crime vector
+        # Check to ensure data is fit to be inserted into mongodb
+        if (all(is.na(distances))) {
+            x["Station"] <- NA
+            x["StationDistance"] <- NA
+        }
+        else {
+            index <- which.min(distances)
+            x["Station"] <- stations$Station[index]
+            kilometers <- distance(as.numeric(x["Latitude"]), as.numeric(x["Longitude"]),
+                                   as.numeric(stations$Latitude[index]),
+                                   as.numeric(stations$Longitude[index]))
+            x["StationDistance"] <- kilometers
+        }
+        
+        # Calculate LSOA name and LA name
+        x["LocalAuthority"] <- filter(LSOA, LSOAcode == x["LSOA.code"])[1,"LAname"]
+        return(x)
     })
     
     t4 <- Sys.time()
-    print(paste("Time to calculate distances:", round(t4 - t3, 4), attr(t4 - t3, "units")))
+    print(paste("Time to make calculations:", round(t4 - t3, 4), attr(t4 - t3, "units")))
     
     dataframe <- as.data.frame(t(processed), stringsAsFactors = F)
     dataframe$Latitude <- as.numeric(dataframe$Latitude)
     dataframe$Longitude <- as.numeric(dataframe$Longitude)
     dataframe$StationDistance <- as.numeric(dataframe$StationDistance)
-    dataframe$Month <- as.POSIXlt(paste0(dataframe$Month, "-01"), "%Y-%m-%d", tz = "GMT")
+    dataframe$ISOMonth <- as.POSIXlt(paste0(dataframe$Month, "-01"), "%Y-%m-%d", tz = "GMT")
     bson <- mongo.bson.from.df(dataframe)
+    # Clean the names by removing the '.' (e.g. "LSOA.code")
+    names(dataframe) <- gsub("\\.", "", names(dataframe))
+
     
     t5 <- Sys.time()
     print(paste("Time to process bson:", round(t5 - t4, 4), attr(t5 - t4, "units")))
     
+    write.csv(dataframe, paste0("./processed/", londonNames[i]))
     # Insert into mongodb (must be done in batches of ~40000 or fails)
     createMongo()
-    batchSize <- 40000
+    batchSize <- 1000
     batches <- ceiling( entries / batchSize )
     remainder <- entries %% batchSize
-    for (i in 1:(batches - 1)) {
+    for (j in 1:(batches)) {
         if (batches != 1) {
-            min <- ((i - 1)*batchSize + 1)
-            max <- i*(batchSize)
+            if ( j == batches) {
+                min <- entries - remainder
+                createMongo
+                mongo.insert.batch(mongo, CRIME, bson[min:entries])
+            } else {
+               min <- ((j - 1)*batchSize + 1)
+               max <- j*(batchSize)
+               createMongo()
+               mongo.insert.batch(mongo, CRIME, bson[ min:max ])
+            }
+
+        } else {
             createMongo()
-            mongo.insert.batch(mongo, CRIME, bson[ min:max ])
-            print(paste("Batch", i, "of", batches, "inserted"))
-                                                                                        }
+            mongo.insert.batch(mongo, CRIME, bson)
+        }
+        print(paste("Batch", j, "of", batches, "inserted"))
     }
-    min <- entries - remainder
-    mongo.insert.batch(mongo, CRIME, bson[min:entries])
-    print(paste("Batch", batches, "of", batches, "inserted"))
     t6 <- Sys.time()
     print(paste("Time to insert documents:", round(t6 - t5, 4), attr(t6 - t5, "units")))
     totalProcessed <- totalProcessed + entries
