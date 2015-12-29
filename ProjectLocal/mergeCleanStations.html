@@ -86,6 +86,7 @@ library(dplyr)</code></pre>
 trainUsage &lt;- read.csv(&quot;station-usage.csv&quot;, stringsAsFactors = F)
 # Read underground train data
 tubeUsage &lt;- read.csv(&quot;multi-year-station-entry-and-exit-figures.csv&quot;, skip=6, stringsAsFactors = F, strip.white = T)
+stations &lt;- read.csv(&quot;London stations.csv&quot;, stringsAsFactors = F)
 
 #------ Defining gloabl variables -----------
 DB &lt;- &quot;DSproject&quot;
@@ -95,27 +96,7 @@ STATIONS &lt;- paste(DB, &quot;stations&quot;, sep=&quot;.&quot;)
 
 # Create mongo connection
 if(exists(&quot;mongo&quot;)) try(mongo.destroy(mongo))
-mongo &lt;&lt;- mongo.create(host = &quot;mongodb-dse662l3.cloudapp.net:27017&quot;, db = DB)
-
-
-# Download stations as a dataframe
-ifelse(mongo.is.connected(mongo), 
-       lstations &lt;- mongo.find.all(mongo, STATIONS),
-       {
-         createMongo()
-         ifelse(mongo.is.connected(mongo),
-                lstations &lt;- mongo.find.all(mongo, STATIONS),
-                stop(&quot;Could not connect to mongoDB&quot;))
-       })
-stations &lt;- data.frame(
-  Station = sapply(lstations, function(x) x$Station),
-  Latitude = sapply(lstations, function(x) x$Latitude),
-  Longitude = sapply(lstations, function(x) x$Longitude),
-  OS.X = sapply(lstations, function(x) x$OS.X),
-  OS.Y = sapply(lstations, function(x) x$OS.Y),
-  Zone = sapply(lstations, function(x) x$Zone),
-  Postcode = sapply(lstations, function(x) x$Postcode)
-)</code></pre>
+mongo &lt;&lt;- mongo.create(host = &quot;mongodb-dse662l3.cloudapp.net:27017&quot;, db = DB)</code></pre>
 </div>
 <div id="cleaning-the-stations-dataset" class="section level3">
 <h3>Cleaning the stations dataset</h3>
@@ -144,13 +125,13 @@ stations$Station &lt;- gsub(&quot;1 2 3&quot;, &quot;123&quot;, stations$Station
 stations$Station &lt;- gsub(&quot;^St Pancras$&quot;, &quot;St.Pancras&quot;, stations$Station)
 str(stations, strict.width = &quot;cut&quot;)</code></pre>
 <pre><code>## 'data.frame':    640 obs. of  7 variables:
-##  $ Station  : chr  &quot;Abbey Road&quot; &quot;Abbey Wood&quot; &quot;Acton Central&quot; &quot;Acton Main&quot;..
+##  $ Station  : chr  &quot;Abbey Road&quot; &quot;Abbey Wood&quot; &quot;Acton Main Line&quot; &quot;Acton Ce&quot;..
+##  $ OS.X     : num  539081 547297 520296 520613 519457 ...
+##  $ OS.Y     : num  539081 547297 520296 520613 519457 ...
 ##  $ Latitude : num  51.5 51.5 51.5 51.5 51.5 ...
-##  $ Longitude: num  0.00374 0.12029 -0.26342 -0.26768 -0.28029 ...
-##  $ OS.X     : num  539081 547297 520613 520296 519457 ...
-##  $ OS.Y     : num  539081 547297 520613 520296 519457 ...
-##  $ Zone     : Factor w/ 16 levels &quot;1&quot;,&quot;2&quot;,&quot;3&quot;,&quot;4&quot;,..: 6 9 4 6 6 8 8 10 2 ..
-##  $ Postcode : Factor w/ 631 levels &quot;BR1 1LX&quot;,&quot;BR1 2EB&quot;,..: 115 419 592 59..</code></pre>
+##  $ Longitude: num  0.00374 0.12029 -0.26768 -0.26342 -0.28029 ...
+##  $ Zone     : Factor w/ 16 levels &quot;&quot;,&quot;1&quot;,&quot;1,2&quot;,&quot;2&quot;,..: 6 9 6 4 6 8 8 10 2..
+##  $ Postcode : chr  &quot;E15 3NB&quot; &quot;SE2 9RH&quot; &quot;W3 0BP&quot; &quot;W3 6BD&quot; ...</code></pre>
 </div>
 <div id="cleaning-data" class="section level3">
 <h3>Cleaning Data</h3>
@@ -198,12 +179,12 @@ mergedStations &lt;- mutate(mergedStations, usage = ifelse(!is.na(TicketUsage), 
 str(mergedStations, strict.width = &quot;cut&quot;)</code></pre>
 <pre><code>## 'data.frame':    640 obs. of  14 variables:
 ##  $ Station     : chr  &quot;Abbey Road&quot; &quot;Abbey Wood&quot; &quot;Acton Central&quot; &quot;Acton M&quot;..
-##  $ Latitude    : num  51.5 51.5 51.5 51.5 51.5 ...
-##  $ Longitude   : num  0.00374 0.12029 -0.26342 -0.26768 -0.28029 ...
 ##  $ OS.X        : num  539081 547297 520613 520296 519457 ...
 ##  $ OS.Y        : num  539081 547297 520613 520296 519457 ...
-##  $ Zone        : Factor w/ 16 levels &quot;1&quot;,&quot;2&quot;,&quot;3&quot;,&quot;4&quot;,..: 6 9 4 6 6 8 8 10..
-##  $ Postcode    : Factor w/ 631 levels &quot;BR1 1LX&quot;,&quot;BR1 2EB&quot;,..: 115 419 592..
+##  $ Latitude    : num  51.5 51.5 51.5 51.5 51.5 ...
+##  $ Longitude   : num  0.00374 0.12029 -0.26342 -0.26768 -0.28029 ...
+##  $ Zone        : Factor w/ 16 levels &quot;&quot;,&quot;1&quot;,&quot;1,2&quot;,&quot;2&quot;,..: 6 9 4 6 6 8 8 1..
+##  $ Postcode    : chr  &quot;E15 3NB&quot; &quot;SE2 9RH&quot; &quot;W3 6BD&quot; &quot;W3 0BP&quot; ...
 ##  $ Borough     : chr  NA &quot;Greenwich&quot; &quot;Ealing&quot; &quot;Ealing&quot; ...
 ##  $ Owner       : chr  NA &quot;Southeastern&quot; &quot;London Overground&quot; &quot;First Great&quot;..
 ##  $ TicketUsage : num  NA 3319408 2940598 454106 NA ...
@@ -211,7 +192,94 @@ str(mergedStations, strict.width = &quot;cut&quot;)</code></pre>
 ##  $ EntryExitEst: num  NA NA NA NA 6060000 ...
 ##  $ tubeComments: chr  NA NA NA NA ...
 ##  $ usage       : num  NA 3319408 2940598 454106 6060000 ...</code></pre>
-<pre class="r"><code>#mergedStations &lt;- select(mergedStations, -`_id`)</code></pre>
+<pre class="r"><code>index &lt;- which(is.na(mergedStations$Borough))
+boroughs &lt;- c(&quot;Newham&quot;, &quot;Ealing&quot;, &quot;Croydon&quot;, &quot;Croydon&quot;, &quot;City of London&quot;, 
+              &quot;Tower Hamlets&quot;, &quot;Tower Hamlets&quot;, &quot;Brent&quot;, &quot;Buckinghamshire&quot;, &quot;Croydon&quot;, 
+              &quot;Islington&quot;, &quot;Islington&quot;, &quot;Croydon&quot;, &quot;Enfield&quot;, &quot;Islington&quot;, 
+              &quot;Bromley&quot;, &quot;Westminster&quot;, &quot;City of London&quot;, &quot;Sutton&quot;, &quot;City of London&quot;, 
+              &quot;Redbridge&quot;, &quot;Hammersmith &amp; Fulham&quot;, &quot;Westminster&quot;, &quot;Bromley&quot;, &quot;Newham&quot;, 
+              &quot;Newham&quot;, &quot;Barking and Dagenham&quot;, &quot;Sutton&quot;, &quot;Sutton&quot;, &quot;Camden&quot;, 
+              &quot;Southwark&quot;, &quot;Tower Hamlets&quot;, &quot;Croydon&quot;, &quot;Tower Hamlets&quot;, &quot;City of Westminster&quot;, 
+              &quot;Southwark&quot;, &quot;Hounslow&quot;, &quot;Haringey&quot;, &quot;Tower Hamlets&quot;,  &quot;Tower Hamlets&quot;, 
+              &quot;Barnet&quot;, &quot;Borough&quot;, &quot;Tower Hamlets&quot;, &quot;Broxbourne&quot;, &quot;Epping Forest&quot;, 
+              &quot;Barnet&quot;, &quot;Hertfordshire&quot;, &quot;Islington&quot;, &quot;Camden&quot;, &quot;Tower Hamlets&quot;, 
+              &quot;Newham&quot;, &quot;Harrow&quot;, &quot;Hertforshire&quot;, &quot;Surrey&quot;, &quot;Croydon&quot;, 
+              &quot;Thurrock&quot;, &quot;Buckinghamshire&quot;, &quot;Camden&quot;, &quot;Camden&quot;, &quot;Buckinghamshire&quot;, 
+              &quot;Broxbourne&quot;, &quot;Epping Forest&quot;, &quot;Reigate and Banstead&quot;, &quot;Ealing&quot;, &quot;Heretfordshire&quot;, 
+              &quot;Croydon&quot;, &quot;Lambeth&quot;, &quot;Lambeth&quot;, &quot;Wandsworth&quot;, &quot;Elmbridge&quot;, 
+              &quot;Enfield&quot;, &quot;Barnet&quot;, &quot;Merton&quot;, &quot;Croydon&quot;, &quot;City of Westminster&quot;, 
+              &quot;Tower Hamlets&quot;, &quot;Heretfordshire&quot;, &quot;Newham&quot;, &quot;Greenwich&quot;, &quot;Newham&quot;, 
+              &quot;Barking and Dagenham&quot;, &quot;Barking and Dagenham&quot;, &quot;Hackney&quot;, &quot;Dartford&quot;, &quot;Epping Forest&quot;, 
+              &quot;Greenwich&quot;, &quot;Tower Hamlets&quot;, &quot;Brent&quot;, &quot;Merton&quot;, &quot;Ealing&quot;, 
+              &quot;Kensington and Chelsea&quot;, &quot;Hammersmith &amp; Fulham&quot;, &quot;Barnet&quot;, &quot;Newham&quot;, &quot;Tower Hamlets&quot;, 
+              &quot;Wandsworth&quot;, &quot;Hillingdon&quot;, &quot;Barnet&quot;, &quot;City of Westminster&quot;, &quot;City of Westminster&quot;, 
+              &quot;Havering&quot;, &quot;Hertfordshire&quot;, &quot;Lewisham&quot;, &quot;City of Westminster&quot;, &quot;Epping Forest&quot;, 
+              &quot;Reigate and Banstead&quot;, &quot;Camden&quot;, &quot;Epsom and Ewell&quot;, &quot;Epsom and Ewell&quot;, &quot;Redbridge&quot;, 
+              &quot;Croydon&quot;, &quot;Barnet&quot;, &quot;Camden&quot;, &quot;Hammersmith &amp; Fulham&quot;, &quot;Newham&quot;, 
+              &quot;Redbridge&quot;, &quot;Croydon&quot;, &quot;Kensington and Chelsea&quot;, &quot;Barnet&quot;, &quot;Hammersmith &amp; Fulham&quot;, 
+              &quot;Camden&quot;, &quot;Epping Forest&quot;, &quot;Croydon&quot;, &quot;City of Westminster&quot;, &quot;City of Westminster&quot;,
+              &quot;Redbridge&quot;, &quot;Hammersmith &amp; Fulham&quot;, &quot;Hammersmith &amp; Fulham&quot;, &quot;Camden&quot;, &quot;Elmbridge&quot;,
+              &quot;Ealing&quot;, &quot;Croydon&quot;, &quot;Harrow&quot;, &quot;Spelthorne&quot;, &quot;Bromley&quot;, 
+              &quot;Hillingdon&quot;, &quot;Hillingdon&quot;, &quot;Hillingdon&quot;, &quot;Barnet&quot;, &quot;Tower Hamlets&quot;, 
+              &quot;Barnet&quot;, &quot;Kensington and Chelsea&quot;, &quot;Haringey&quot;, &quot;Hillingdon&quot;, &quot;Camden&quot;, 
+              &quot;Kensington and Chelsea&quot;, &quot;Islington&quot;, &quot;Havering&quot;, &quot;Hounslow&quot;, &quot;Hounslow&quot;,
+              &quot;Hounslow&quot;, &quot;City of Westminster&quot;, &quot;Hillingdon&quot;, &quot;Tower Hamlets&quot;, &quot;Southwark&quot;,
+              &quot;Hammersmith &amp; Fulham&quot;, &quot;Brent&quot;, &quot;Brent&quot;, &quot;Newham&quot;, &quot;Croydon&quot;, 
+              &quot;Camden&quot;, &quot;Brent&quot;, &quot;Reigate and Banstead&quot;, &quot;Kensington and Chelsea&quot;, &quot;Kensington and Chelsea&quot;,
+              &quot;Lambeth&quot;, &quot;City of Westminster&quot;, &quot;Tower Hamlets&quot;, &quot;Kensington and Chelsea&quot;, &quot;Croydon&quot;,
+              &quot;City of Westminster&quot;, &quot;Waltham Forest&quot;, &quot;Waltham Forest&quot;, &quot;Croydon&quot;, &quot;Newham&quot;,
+              &quot;Epping Forest&quot;, &quot;City of Westminster&quot;, &quot;Hackney&quot;, &quot;City of London&quot;, &quot;City of Westminster&quot;,
+              &quot;Merton&quot;, &quot;Tower Hamlets&quot;, &quot;Barnet&quot;, &quot;Merton&quot;, &quot;City of London&quot;,
+              &quot;Hertfordshire&quot;, &quot;Merton&quot;, &quot;Merton&quot;, &quot;Camden&quot;, &quot;Tower Hamlets&quot;,
+              &quot;Brent&quot;, &quot;Croydon&quot;, &quot;Redbridge&quot;, &quot;Ealing&quot;, &quot;Ealing&quot;, 
+              &quot;Greenwich&quot;, &quot;Harrow&quot;, &quot;Ealing&quot;, &quot;Ealing&quot;, &quot;Brent&quot;,
+              &quot;Hillingdon&quot;, &quot;Hillingdon&quot;, &quot;Kensington Chelsea&quot;, &quot;Enfield&quot;, &quot;Thurrock&quot;,
+              &quot;Hounslow&quot;, &quot;Lambeth&quot;, &quot;City of Westminster&quot;, &quot;Ealing&quot;, &quot;Hammersmith &amp;  Fulham&quot;, 
+              &quot;Ealing&quot;, &quot;Merton&quot;, &quot;City of Westminster&quot;, &quot;City of Westminster&quot;, &quot;Harrow&quot;, 
+              &quot;Newham&quot;, &quot;Newham&quot;, &quot;Tower Hamlets&quot;, &quot;Brent&quot;, &quot;Newham&quot;,
+              &quot;Newham&quot;, &quot;Thurrock&quot;, &quot;Hammersmith &amp; Fulham&quot;, &quot;Brent&quot;, &quot;Southwark&quot;,
+              &quot;Brent&quot;, &quot;Lambeth&quot;, &quot;City of Westminster&quot;, &quot;Hertfordshire&quot;, &quot;Havering&quot;,
+              &quot;Hammersmith &amp; Fulham&quot;, &quot;Harrow&quot;, &quot;Redbridge&quot;, &quot;Croydon&quot;, &quot;Croydon&quot;,
+              &quot;City of Westminster&quot;, &quot;Hertfordshire&quot;, &quot;Epping Forest&quot;, &quot;Newham&quot;, &quot;City of Westminster&quot;,
+              &quot;Newham&quot;, &quot;Hillingdon&quot;, &quot;Hillingdon&quot;, &quot;Hillingdon&quot;, &quot;Camden&quot;,
+              &quot;Croydon&quot;, &quot;Brentwood&quot;, &quot;Hammersmith &amp; Fulham&quot;, &quot;Kensington and Chelsea&quot;, &quot;Croydon&quot;,
+              &quot;Redbridge&quot;, &quot;Ealing&quot;, &quot;Harrow&quot;, &quot;Kensington and Chelsea&quot;, &quot;Tower Hamlets&quot;, 
+              &quot;Merton&quot;, &quot;Redbridge&quot;, &quot;Wandsworth&quot;, &quot;Enfield&quot;, &quot;Southwark&quot;, 
+              &quot;Merton&quot;, &quot;Waltham Forest&quot;, &quot;Lewisham&quot;, &quot;Richmond&quot;, &quot;Bromley&quot;,
+              &quot;City of Westminster&quot;, &quot;City of Westminster&quot;, &quot;City of London&quot;, &quot;Hounslow&quot;, &quot;Harrow&quot;,
+              &quot;Newham&quot;, &quot;Tower Hamlets&quot;, &quot;Lambeth&quot;, &quot;Epsom and Ewell&quot;, &quot;Newham&quot;,
+              &quot;Harrow&quot;, &quot;Brent&quot;, &quot;Sutton&quot;, &quot;Camden&quot;, &quot;Reigate and Banstead&quot;,
+              &quot;Reigate and Banstead&quot;, &quot;City of Westminster&quot;, &quot;Elmbridge&quot;, &quot;Broxbourne&quot;, &quot;Croydon&quot;,
+              &quot;Epping Forest&quot;, &quot;Wandsworth&quot;, &quot;Wandsworth&quot;, &quot;City of Westminster&quot;, &quot;Barnet&quot;,
+              &quot;City of London&quot;, &quot;Tower Hamlets&quot;, &quot;Camden&quot;, &quot;Hounslow&quot;, &quot;Haringey&quot;,
+              &quot;Havering&quot;, &quot;Barking and Dagenham&quot;, &quot;Surrey&quot;, &quot;Newham&quot;, &quot;Hillingdon&quot;,
+              &quot;Croydon&quot;, &quot;Broxbourne&quot;, &quot;Croydon&quot;, &quot;Redbridge&quot;, &quot;Camden&quot;, 
+              &quot;City of Westminster&quot;, &quot;Hertfordshire&quot;, &quot;Hertfordshire&quot;, &quot;Hertfordshire&quot;, &quot;Croydon&quot;,
+              &quot;Brent&quot;, &quot;Ealing&quot;, &quot;Barnet&quot;, &quot;Harrow&quot;, &quot;Tower Hamlets&quot;, 
+              &quot;Hammersmith &amp; Fulham&quot;, &quot;Newham&quot;, &quot;Kensington and Chelsea&quot;, &quot;Tower Hamlets&quot;, &quot;City of Westminster&quot;,
+              &quot;Hammersmith &amp; Fulham&quot;, &quot;Surrey&quot;, &quot;Surrey&quot;, &quot;Brent&quot;, &quot;Merton&quot;, 
+              &quot;Haringey&quot;, &quot;Hammersmith &amp; Fulham&quot;, &quot;Redbridge&quot;, &quot;Croydon&quot;, &quot;Barnet&quot;
+)
+mergedStations$Borough[index] &lt;- sapply(index, function(x) {
+  mergedStations$Borough[x] &lt;- boroughs[x]
+})
+
+# Found an incorrect post code
+mergedStations$Postcode &lt;- as.character(mergedStations$Postcode)
+mergedStations$Postcode[which(mergedStations$Station == &quot;Bond Street&quot;)] &lt;- &quot;W1C 2JS&quot;
+mergedStations$Postcode[which(mergedStations$Station == &quot;Canning Tower&quot;)] &lt;- &quot;E16 1ED&quot;
+mergedStations$Postcode[which(mergedStations$Station == &quot;Deptford Bridge&quot;)] &lt;- &quot;SE8 4HH&quot;
+mergedStations$Postcode[which(mergedStations$Station == &quot;Epsom Downs&quot;)] &lt;- &quot;KT17 4JP&quot;
+mergedStations$Postcode[which(mergedStations$Station == &quot;Euston Square&quot;)] &lt;- &quot;NW1 2BF&quot;
+mergedStations$Postcode[which(mergedStations$Station == &quot;George Street&quot;)] &lt;- &quot;CR0 1LA&quot;
+mergedStations$Postcode[which(mergedStations$Station == &quot;Heathrow Terminal 4&quot;)] &lt;- &quot;TW6 3YD&quot;
+mergedStations$Postcode[which(mergedStations$Station == &quot;Heron Quays&quot;)] &lt;- &quot;E14 4AD&quot;
+mergedStations$Postcode[which(mergedStations$Station == &quot;Manor House&quot;)] &lt;- &quot;N4 2LX&quot;
+mergedStations$Postcode[which(mergedStations$Station == &quot;Purfleet&quot;)] &lt;- &quot;RM19 1PL&quot;
+mergedStations$Postcode[which(mergedStations$Station == &quot;Regents Park&quot;)] &lt;- &quot;NW1 5HD&quot;
+mergedStations$Postcode[which(mergedStations$Station == &quot;Tottenham Court Road&quot;)] &lt;- &quot;W1D 1AP&quot;
+mergedStations$Postcode[which(mergedStations$Station == &quot;Tufnell Park&quot;)] &lt;- &quot;N19 5AA&quot;
+mergedStations$Postcode[which(mergedStations$Station == &quot;Wood Lane&quot;)] &lt;- &quot;W12 7TU&quot;</code></pre>
 <p>Finally we replace our stations dataset on mongodb with the merged stations data.</p>
 <pre class="r"><code>if(mongo.is.connected(mongo) == TRUE) {
   bson &lt;- mongo.bson.from.df(mergedStations)

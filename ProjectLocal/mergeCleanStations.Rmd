@@ -24,6 +24,7 @@ This comes from 2 sources:
 trainUsage <- read.csv("station-usage.csv", stringsAsFactors = F)
 # Read underground train data
 tubeUsage <- read.csv("multi-year-station-entry-and-exit-figures.csv", skip=6, stringsAsFactors = F, strip.white = T)
+stations <- read.csv("London stations.csv", stringsAsFactors = F)
 
 #------ Defining gloabl variables -----------
 DB <- "DSproject"
@@ -34,8 +35,9 @@ STATIONS <- paste(DB, "stations", sep=".")
 # Create mongo connection
 if(exists("mongo")) try(mongo.destroy(mongo))
 mongo <<- mongo.create(host = "mongodb-dse662l3.cloudapp.net:27017", db = DB)
+```
 
-
+```{r, eval=FALSE, echo=FALSE}
 # Download stations as a dataframe
 ifelse(mongo.is.connected(mongo), 
        lstations <- mongo.find.all(mongo, STATIONS),
@@ -132,6 +134,114 @@ mergedStations <- mutate(mergedStations, usage = ifelse(!is.na(TicketUsage), Tic
 str(mergedStations, strict.width = "cut")
 ```
 
+```{r adding type}
+#mergedStations$Owner <- 
+  invisible(sapply(1:nrow(mergedStations), function(x) {
+  ifelse(!is.na(mergedStations$EntryExitEst[x]) & is.na(mergedStations$TicketUsage[x]), {
+    mergedStations$Owner[x] <<- "TFL"
+    mergedStations$Type[x] <<- "Tube"
+  },
+  ifelse(is.na(mergedStations$EntryExitEst[x]) & !is.na(mergedStations$TicketUsage[x]),
+  mergedStations$Type[x] <<- "Rail",
+  ifelse(!is.na(mergedStations$EntryExitEst[x]) & !is.na(mergedStations$TicketUsage[x]),
+  mergedStations$Type[x] <<- "Tube, Rail",
+  mergedStations$Type[x] <<- "Other"
+  )))
+}))
+
+```
+Manually add the borough information by querying the website http://local.direct.gov.uk/LDGRedirect/index.jsp?mode=1.1
+```{r adding borough, echo = FALSE}
+index <- which(is.na(mergedStations$Borough))
+boroughs <- c("Newham", "Ealing", "Croydon", "Croydon", "City of London", 
+              "Tower Hamlets", "Tower Hamlets", "Brent", "Buckinghamshire", "Croydon", 
+              "Islington", "Islington", "Croydon", "Enfield", "Islington", 
+              "Bromley", "Westminster", "City of London", "Sutton", "City of London", 
+              "Redbridge", "Hammersmith & Fulham", "Westminster", "Bromley", "Newham", 
+              "Newham", "Barking and Dagenham", "Sutton", "Sutton", "Camden", 
+              "Southwark", "Tower Hamlets", "Croydon", "Tower Hamlets", "City of Westminster", 
+              "Southwark", "Hounslow", "Haringey", "Tower Hamlets",  "Tower Hamlets", 
+              "Barnet", "Borough", "Tower Hamlets", "Broxbourne", "Epping Forest", 
+              "Barnet", "Hertfordshire", "Islington", "Camden", "Tower Hamlets", 
+              "Newham", "Harrow", "Hertforshire", "Surrey", "Croydon", 
+              "Thurrock", "Buckinghamshire", "Camden", "Camden", "Buckinghamshire", 
+              "Broxbourne", "Epping Forest", "Reigate and Banstead", "Ealing", "Heretfordshire", 
+              "Croydon", "Lambeth", "Lambeth", "Wandsworth", "Elmbridge", 
+              "Enfield", "Barnet", "Merton", "Croydon", "City of Westminster", 
+              "Tower Hamlets", "Heretfordshire", "Newham", "Greenwich", "Newham", 
+              "Barking and Dagenham", "Barking and Dagenham", "Hackney", "Dartford", "Epping Forest", 
+              "Greenwich", "Tower Hamlets", "Brent", "Merton", "Ealing", 
+              "Kensington and Chelsea", "Hammersmith & Fulham", "Barnet", "Newham", "Tower Hamlets", 
+              "Wandsworth", "Hillingdon", "Barnet", "City of Westminster", "City of Westminster", 
+              "Havering", "Hertfordshire", "Lewisham", "City of Westminster", "Epping Forest", 
+              "Reigate and Banstead", "Camden", "Epsom and Ewell", "Epsom and Ewell", "Redbridge", 
+              "Croydon", "Barnet", "Camden", "Hammersmith & Fulham", "Newham", 
+              "Redbridge", "Croydon", "Kensington and Chelsea", "Barnet", "Hammersmith & Fulham", 
+              "Camden", "Epping Forest", "Croydon", "City of Westminster", "City of Westminster",
+              "Redbridge", "Hammersmith & Fulham", "Hammersmith & Fulham", "Camden", "Elmbridge",
+              "Ealing", "Croydon", "Harrow", "Spelthorne", "Bromley", 
+              "Hillingdon", "Hillingdon", "Hillingdon", "Barnet", "Tower Hamlets", 
+              "Barnet", "Kensington and Chelsea", "Haringey", "Hillingdon", "Camden", 
+              "Kensington and Chelsea", "Islington", "Havering", "Hounslow", "Hounslow",
+              "Hounslow", "City of Westminster", "Hillingdon", "Tower Hamlets", "Southwark",
+              "Hammersmith & Fulham", "Brent", "Brent", "Newham", "Croydon", 
+              "Camden", "Brent", "Reigate and Banstead", "Kensington and Chelsea", "Kensington and Chelsea",
+              "Lambeth", "City of Westminster", "Tower Hamlets", "Kensington and Chelsea", "Croydon",
+              "City of Westminster", "Waltham Forest", "Waltham Forest", "Croydon", "Newham",
+              "Epping Forest", "City of Westminster", "Hackney", "City of London", "City of Westminster",
+              "Merton", "Tower Hamlets", "Barnet", "Merton", "City of London",
+              "Hertfordshire", "Merton", "Merton", "Camden", "Tower Hamlets",
+              "Brent", "Croydon", "Redbridge", "Ealing", "Ealing", 
+              "Greenwich", "Harrow", "Ealing", "Ealing", "Brent",
+              "Hillingdon", "Hillingdon", "Kensington Chelsea", "Enfield", "Thurrock",
+              "Hounslow", "Lambeth", "City of Westminster", "Ealing", "Hammersmith &  Fulham", 
+              "Ealing", "Merton", "City of Westminster", "City of Westminster", "Harrow", 
+              "Newham", "Newham", "Tower Hamlets", "Brent", "Newham",
+              "Newham", "Thurrock", "Hammersmith & Fulham", "Brent", "Southwark",
+              "Brent", "Lambeth", "City of Westminster", "Hertfordshire", "Havering",
+              "Hammersmith & Fulham", "Harrow", "Redbridge", "Croydon", "Croydon",
+              "City of Westminster", "Hertfordshire", "Epping Forest", "Newham", "City of Westminster",
+              "Newham", "Hillingdon", "Hillingdon", "Hillingdon", "Camden",
+              "Croydon", "Brentwood", "Hammersmith & Fulham", "Kensington and Chelsea", "Croydon",
+              "Redbridge", "Ealing", "Harrow", "Kensington and Chelsea", "Tower Hamlets", 
+              "Merton", "Redbridge", "Wandsworth", "Enfield", "Southwark", 
+              "Merton", "Waltham Forest", "Lewisham", "Richmond", "Bromley",
+              "City of Westminster", "City of Westminster", "City of London", "Hounslow", "Harrow",
+              "Newham", "Tower Hamlets", "Lambeth", "Epsom and Ewell", "Newham",
+              "Harrow", "Brent", "Sutton", "Camden", "Reigate and Banstead",
+              "Reigate and Banstead", "City of Westminster", "Elmbridge", "Broxbourne", "Croydon",
+              "Epping Forest", "Wandsworth", "Wandsworth", "City of Westminster", "Barnet",
+              "City of London", "Tower Hamlets", "Camden", "Hounslow", "Haringey",
+              "Havering", "Barking and Dagenham", "Surrey", "Newham", "Hillingdon",
+              "Croydon", "Broxbourne", "Croydon", "Redbridge", "Camden", 
+              "City of Westminster", "Hertfordshire", "Hertfordshire", "Hertfordshire", "Croydon",
+              "Brent", "Ealing", "Barnet", "Harrow", "Tower Hamlets", 
+              "Hammersmith & Fulham", "Newham", "Kensington and Chelsea", "Tower Hamlets", "City of Westminster",
+              "Hammersmith & Fulham", "Surrey", "Surrey", "Brent", "Merton", 
+              "Haringey", "Hammersmith & Fulham", "Redbridge", "Croydon", "Barnet"
+)
+mergedStations$Borough[index] <- sapply(index, function(x) {
+  mergedStations$Borough[x] <- boroughs[x]
+})
+
+# Found an incorrect post code
+mergedStations$Postcode <- as.character(mergedStations$Postcode)
+mergedStations$Postcode[which(mergedStations$Station == "Bond Street")] <- "W1C 2JS"
+mergedStations$Postcode[which(mergedStations$Station == "Canning Tower")] <- "E16 1ED"
+mergedStations$Postcode[which(mergedStations$Station == "Deptford Bridge")] <- "SE8 4HH"
+mergedStations$Postcode[which(mergedStations$Station == "Epsom Downs")] <- "KT17 4JP"
+mergedStations$Postcode[which(mergedStations$Station == "Euston Square")] <- "NW1 2BF"
+mergedStations$Postcode[which(mergedStations$Station == "George Street")] <- "CR0 1LA"
+mergedStations$Postcode[which(mergedStations$Station == "Heathrow Terminal 4")] <- "TW6 3YD"
+mergedStations$Postcode[which(mergedStations$Station == "Heron Quays")] <- "E14 4AD"
+mergedStations$Postcode[which(mergedStations$Station == "Manor House")] <- "N4 2LX"
+mergedStations$Postcode[which(mergedStations$Station == "Purfleet")] <- "RM19 1PL"
+mergedStations$Postcode[which(mergedStations$Station == "Regents Park")] <- "NW1 5HD"
+mergedStations$Postcode[which(mergedStations$Station == "Tottenham Court Road")] <- "W1D 1AP"
+mergedStations$Postcode[which(mergedStations$Station == "Tufnell Park")] <- "N19 5AA"
+mergedStations$Postcode[which(mergedStations$Station == "Wood Lane")] <- "W12 7TU"
+
+```
 Finally we replace our stations dataset on mongodb with the merged stations data. 
 ```{r upload, eval=FALSE}
 if(mongo.is.connected(mongo) == TRUE) {
