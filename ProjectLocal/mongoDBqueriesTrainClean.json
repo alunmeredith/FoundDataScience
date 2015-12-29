@@ -1,5 +1,89 @@
+// Find the boroughs that differ on the website lookup to the LSOA lookup databases and correct them to be the same as the LSOA lookup database.
+
+// finding
 db.stations.distinct(
 	"Borough",
+{
+	"Borough": 
+	{ 
+		"$nin": ["City of London", "Barking and Dagenham", "Barnet", "Bexley", "Brent", "Bromley", "Croydon", "Camden", "Ealing", "Enfield", "Greenwich", "Hackney", "Hammersmith and Fulham", "Haringey", "Harrow", "Havering", "Hillingdon", "Hounslow", "Islington", "Kensington and Chelsea", "Kingston upon Thames", "Lambeth", "Lewisham", "Merton", "Newham", "Redbridge", "Richmond upon Thames", "Southwark", "Sutton", "Tower Hamlets", "Waltham Forest", "Westminster", "Wandsworth"]
+	}
+}
+)
+
+// updating
+db.stations.update(
+	{ "Borough": "Barking And Dagenham" },
+	{ $set: 
+		{ 
+			"Borough": "Barking and Dagenham"
+		} 
+	},
+	{ multi: true }
+)
+
+db.stations.update(
+	{ "Borough": "Richmond Upon Thames" },
+	{ $set: 
+		{ 
+			"Borough": "Richmond upon Thames"
+		} 
+	},
+	{ multi: true }
+)
+
+db.stations.update(
+	{ "Borough": "Kingston Upon Thames" },
+	{ $set: 
+		{ 
+			"Borough": "Kingston upon Thames"
+		} 
+	},
+	{ multi: true }
+)
+
+db.stations.update(
+	{ "Borough": "City Of London" },
+	{ $set: 
+		{ 
+			"Borough": "City of London"
+		} 
+	},
+	{ multi: true }
+)
+
+db.stations.update(
+	{ "Borough": "Kensington And Chelsea" },
+	{ $set: 
+		{ 
+			"Borough": "Kensington and Chelsea"
+		} 
+	},
+	{ multi: true }
+)
+
+db.stations.update(
+	{ "Borough": "Hammersmith And Fulham" },
+	{ $set: 
+		{ 
+			"Borough": "Hammersmith and Fulham"
+		} 
+	},
+	{ multi: true }
+)
+
+db.stations.update(
+	{ "Borough": "Hammersmith &  Fulham" },
+	{ $set: 
+		{ 
+			"Borough": "Hammersmith and Fulham"
+		} 
+	},
+	{ multi: true }
+)
+
+// Remove any remaining stations not in the list (because not in london)
+db.stations.remove(
 {
 	"Borough": 
 	{ 
