@@ -26,7 +26,7 @@ t0 <- Sys.time()
 
 #------ Defining gloabl variables ---------
 DB <- "DSproject"
-CRIME <- paste(DB, "test", sep = ".")
+CRIME <- paste(DB, "londonCrime3", sep = ".")
 STATIONS <- paste(DB, "stations", sep = ".")
 startTime <- Sys.time()
 mongo <- NA
@@ -100,7 +100,7 @@ londonNames <- gsub("^.*?/", "", londonNames)
 
 #######################
 #for (i in (filesProcessed + 1):length(londonfiles)) {
-for (i in seq(3, 90, 3)) {
+for (i in seq(106, 174, 3)) {
     t2a <- Sys.time()
     table <- read.csv(londonfiles[i])
     entries <- nrow(table)
@@ -146,10 +146,10 @@ for (i in seq(3, 90, 3)) {
     dataframe$Longitude <- as.numeric(dataframe$Longitude)
     dataframe$StationDistance <- as.numeric(dataframe$StationDistance)
     dataframe$ISOMonth <- as.POSIXlt(paste0(dataframe$Month, "-01"), "%Y-%m-%d", tz = "GMT")
-    bson <- mongo.bson.from.df(dataframe)
     # Clean the names by removing the '.' (e.g. "LSOA.code")
     names(dataframe) <- gsub("\\.", "", names(dataframe))
-
+    bson <- mongo.bson.from.df(dataframe)
+    
     
     t5 <- Sys.time()
     print(paste("Time to process bson:", round(t5 - t4, 4), attr(t5 - t4, "units")))
