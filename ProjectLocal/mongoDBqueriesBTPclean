@@ -1,0 +1,22 @@
+// There are only a handful of crimes listed near any of our stations which fall outside the boroughs of london, so these crimes will be discounted. It should be noted already though that these stations are biased as they don't account for all crimes around them. 
+
+// finding
+db.londonCrime3.find(
+{
+	"LocalAuthority": 
+		{ 
+		"$nin": ["City of London", "Barking and Dagenham", "Barnet", "Bexley", "Brent", "Bromley", "Croydon", "Camden", "Ealing", "Enfield", "Greenwich", "Hackney", "Hammersmith and Fulham", "Haringey", "Harrow", "Havering", "Hillingdon", "Hounslow", "Islington", "Kensington and Chelsea", "Kingston upon Thames", "Lambeth", "Lewisham", "Merton", "Newham", "Redbridge", "Richmond upon Thames", "Southwark", "Sutton", "Tower Hamlets", "Waltham Forest", "Westminster", "Wandsworth"]
+		}
+}
+)
+
+
+// Remove any remaining stations not in the list (because not in london)
+db.londonCrime3.remove(
+{
+	"LocalAuthority": 
+	{ 
+		"$nin": ["City of London", "Barking and Dagenham", "Barnet", "Bexley", "Brent", "Bromley", "Croydon", "Camden", "Ealing", "Enfield", "Greenwich", "Hackney", "Hammersmith and Fulham", "Haringey", "Harrow", "Havering", "Hillingdon", "Hounslow", "Islington", "Kensington and Chelsea", "Kingston upon Thames", "Lambeth", "Lewisham", "Merton", "Newham", "Redbridge", "Richmond upon Thames", "Southwark", "Sutton", "Tower Hamlets", "Waltham Forest", "Westminster", "Wandsworth"]
+	}
+}
+)
