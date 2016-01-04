@@ -3,10 +3,10 @@ source('rHeader.R')
 
 # Download list of stations
 createMongo()
-stations <- mongo.find.all(mongo, STATIONS)
+stations <- mongo.find.all(mongo, STATIONS, '{"Crimes": { "$exists":0 }}')
 
-# Calculate area of circle
-MAX_DIST <- 0.3
+# Calculate area of circle (in m^2)
+MAX_DIST <- 0.3*1000
 AREA <- pi * (MAX_DIST/2)^2 
 
 # loop through each station
@@ -14,25 +14,42 @@ sapply(1:length(stations), function(index){
     area <- AREA
     station <- stations[[index]]
 
-    # Check if there is another station overlapping the cirlce
-    if (station["nearestDist"] < MAX_DIST*2) {
-        stations[index, "Overlapping"] <<- TRUE
-        d <- station["nearestDist"]
-        r <- MAX_DIST
-        overlap <- 2 * r^2 * acos(d/(2*r)) - (d/2) * sqrt(4*r^2 - d^2)
-        area <<- AREA - overlap/2
-        }
-    
+#     # Check if there is another station overlapping the cirlce
+#     if (station["nearestDist"] < MAX_DIST*2) {
+#         stations[index, "Overlapping"] <<- TRUE
+#         d <- station["nearestDist"]
+#         r <- MAX_DIST
+#         overlap <- 2 * r^2 * acos(d/(2*r)) - (d/2) * sqrt(4*r^2 - d^2)
+#         area <<- AREA - overlap/2
+#         }
+#     
+    #### FOR ALL CRIMETYPES -------
     ## query all the crimes for the station inside the circle 
     createMongo()
     query <- sprintf('{ "Station": "%s", "StationDistance": { "$lte": %f }}', station[["Station"]], MAX_DIST)
     crimes <- mongo.find.all(mongo, CRIME, query)
     
-    # Calculate and update density
-    density <- length(crimes) / area
+    # Number of crimes
+    crimeCount <- length(crimes)
+    # Calculate density
+    crimeDensity <- length(crimes) / area
+    # Calculate Gaussian weighted density
+    # Calculate relative densities
+    
+    # Update
     createMongo()
-    query <- sprintf( '{ "Station": %s }, "$set" { "CrimeDensity": %f, "Crimes": %d}', station[["Station"]], density, length(crimes))
-    mongo.update(mongo, STATIONS, query)
+    query <- sprintf( '{ "Station": "%s" }', station[["Station"]] ) 
+    update <- sprintf('{"$set": { "CrimeDensity": %f, "Crimes": %d}}', crimeDensity, crimeCount)
+    createMongo()
+    mongo.update(mongo, STATIONS, query, update)
+    
+    
+    ### REPEAT FOR DIFFERENT CRIME TYPES
+    crimeTypes <- mongo.distinct(mongo, CRIMES, "Crimetype")
+    # apply(crimeTypes, ...)
+    
+    
+    print(station[["Station"]])
     
     
     ## TODO: test this code
