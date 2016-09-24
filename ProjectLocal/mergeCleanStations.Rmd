@@ -51,12 +51,13 @@ stations <- data.frame(
   Station = sapply(lstations, function(x) x$Station),
   Latitude = sapply(lstations, function(x) x$Latitude),
   Longitude = sapply(lstations, function(x) x$Longitude),
-  OS.X = sapply(lstations, function(x) x$OS.X),
-  OS.Y = sapply(lstations, function(x) x$OS.Y),
+  OSX = sapply(lstations, function(x) x$OS.X),
+  OSY = sapply(lstations, function(x) x$OS.Y),
   Zone = sapply(lstations, function(x) x$Zone),
   Postcode = sapply(lstations, function(x) x$Postcode)
 )
 
+stations <- select(stations, -OS.X, - OS.Y)
 ```
 
 ### Cleaning the stations dataset
@@ -67,8 +68,8 @@ stations <- data.frame(
 # uploaded data is stored in strings so change the type of variables to be appropriate
 stations$Latitude <- as.numeric(stations$Latitude)
 stations$Longitude <- as.numeric(stations$Longitude)
-stations$OS.X <- as.numeric(stations$OS.X)
-stations$OS.Y <- as.numeric(stations$OS.X)
+stations$OSX <- as.numeric(stations$OS.X)
+stations$OSY <- as.numeric(stations$OS.X)
 stations$Zone <- as.factor(stations$Zone)
 stations$Station <- as.character(stations$Station)
 
@@ -243,9 +244,10 @@ mergedStations$Postcode[which(mergedStations$Station == "Wood Lane")] <- "W12 7T
 ```
 Finally we replace our stations dataset on mongodb with the merged stations data. 
 ```{r upload, eval=FALSE}
+mergedStations <- select(mergedStations, -OS.X, -OS.Y)
 if(mongo.is.connected(mongo) == TRUE) {
   bson <- mongo.bson.from.df(mergedStations)
   mongo.drop(mongo, STATIONS)
-  mongo.insert.batch(mongo, STATIONS, bson) 
+  mongo.insert.batch(mongo, paste0(DB, ".stationsCrime"), bson) 
 }
 ```

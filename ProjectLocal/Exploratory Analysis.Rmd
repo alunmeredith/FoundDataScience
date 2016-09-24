@@ -1,0 +1,31 @@
+---
+title: "StationExploration"
+author: "Alun Meredith"
+date: "31 December 2015"
+output: html_document
+---
+
+```{r header}
+source("rHeader.R")
+```
+
+
+```{r histogram of crimes per station}
+createMongo()
+stationCrimesList <- mongo.find.all(mongo, STATIONS, fields = '{ "_id":0, "Station":1, "Crimes":1 }')
+
+# Build into a dataframe
+station <- list()
+crimes <- list()
+invisible(sapply(1:length(stationCrimesList), function(x) {
+  station <<- c(station, stationCrimesList[[x]]["Station"])
+  crimes <<- c(crimes, stationCrimesList[[x]]["Crimes"])
+}
+))
+stationCrimesDF <- as.data.frame(cbind(Station = unlist(station), Crimes = unlist(crimes)), stringsAsFactors = FALSE)
+stationCrimesDF$Crimes <- as.numeric(stationCrimesDF$Crimes)
+
+hist(as.numeric(stationCrimesDF$Crimes), breaks = seq(0,60000,1000))
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

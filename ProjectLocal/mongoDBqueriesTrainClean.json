@@ -1,7 +1,7 @@
 // Find the boroughs that differ on the website lookup to the LSOA lookup databases and correct them to be the same as the LSOA lookup database.
 
 // finding
-db.stations.distinct(
+db.stationsCrime.distinct(
 	"Borough",
 {
 	"Borough": 
@@ -12,7 +12,7 @@ db.stations.distinct(
 )
 
 // updating
-db.stations.update(
+db.stationsCrime.update(
 	{ "Borough": "Barking And Dagenham" },
 	{ $set: 
 		{ 
@@ -22,7 +22,7 @@ db.stations.update(
 	{ multi: true }
 )
 
-db.stations.update(
+db.stationsCrime.update(
 	{ "Borough": "Richmond Upon Thames" },
 	{ $set: 
 		{ 
@@ -32,7 +32,7 @@ db.stations.update(
 	{ multi: true }
 )
 
-db.stations.update(
+db.stationsCrime.update(
 	{ "Borough": "Kingston Upon Thames" },
 	{ $set: 
 		{ 
@@ -42,7 +42,7 @@ db.stations.update(
 	{ multi: true }
 )
 
-db.stations.update(
+db.stationsCrime.update(
 	{ "Borough": "City Of London" },
 	{ $set: 
 		{ 
@@ -52,7 +52,7 @@ db.stations.update(
 	{ multi: true }
 )
 
-db.stations.update(
+db.stationsCrime.update(
 	{ "Borough": "Kensington And Chelsea" },
 	{ $set: 
 		{ 
@@ -62,7 +62,7 @@ db.stations.update(
 	{ multi: true }
 )
 
-db.stations.update(
+db.stationsCrime.update(
 	{ "Borough": "Hammersmith And Fulham" },
 	{ $set: 
 		{ 
@@ -72,7 +72,7 @@ db.stations.update(
 	{ multi: true }
 )
 
-db.stations.update(
+db.stationsCrime.update(
 	{ "Borough": "Hammersmith &  Fulham" },
 	{ $set: 
 		{ 
@@ -83,7 +83,7 @@ db.stations.update(
 )
 
 // Remove any remaining stations not in the list (because not in london)
-db.stations.remove(
+db.stationsCrime.remove(
 {
 	"Borough": 
 	{ 
