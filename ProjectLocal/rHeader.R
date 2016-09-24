@@ -4,9 +4,15 @@ library(dplyr)
 #------ Defining gloabl variables ---------
 DB <- "DSproject"
 CRIME <- paste(DB, "londonCrime3", sep = ".")
+<<<<<<< HEAD
 STATIONS <- paste(DB, "stationsCrime", sep = ".")
 STATIONSCRIME <- paste(DB, "stationsCrime3", sep = ".")
 BOROUGHS <- paste(DB, "boroughs", sep = ".")
+=======
+STATIONS <- paste(DB, "stationsCrime3", sep = ".")
+SCHOOLS <- paste(DB, "secSchoolsLond", sep = ".")
+CRIMESCHOOLS <- paste(DB, "londonCrime6", sep = ".")
+>>>>>>> e60211aad9680ef8bf1e08a9ab4fd0443010fd7e
 startTime <- Sys.time()
 mongo <- NA
 
